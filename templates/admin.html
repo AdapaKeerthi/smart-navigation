@@ -1,0 +1,43 @@
+<h2>👨‍💻 Admin Panel</h2>
+
+<h3>Users</h3>
+<table border="1">
+<tr><th>ID</th><th>Username</th></tr>
+
+{% for u in users %}
+<tr>
+<td>{{u[0]}}</td>
+<td>{{u[1]}}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+<br><br>
+
+<h3>Driving Data</h3>
+<table border="1">
+
+<tr>
+<th>User</th>
+<th>Deviation</th>
+<th>Stops</th>
+<th>Confusion</th>
+<th>Score</th>
+<th>Type</th>
+<th>Time</th>
+</tr>
+
+{% for d in data %}
+<tr>
+<td>{{d[0]}}</td>
+<td>{{d[1]}}</td>
+<td>{{d[2]}}</td>
+<td>{{d[3]}}</td>
+<td>{{d[4]}}</td>
+<td>{{d[5]}}</td>
+<td>{{d[6]}}</td>
+</tr>
+{% endfor %}
+
+</table>

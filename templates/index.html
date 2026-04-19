@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Navigation</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:sans-serif;
+overflow:hidden;
+}
+
+#map{
+position:fixed;
+top:0;
+left:0;
+right:0;
+bottom:0;
+z-index:1;
+}
+
+#dashboard{
+position:absolute;
+top:10px;
+left:10px;
+z-index:2000;
+background:white;
+padding:12px;
+border-radius:12px;
+box-shadow:0 2px 10px rgba(0,0,0,0.2);
+width:220px;
+}
+
+.search-bar{
+position:absolute;
+top:10px;
+left:50%;
+transform:translateX(-50%);
+width:90%;
+max-width:500px;
+background:white;
+padding:10px;
+border-radius:20px;
+z-index:1000;
+}
+
+input{
+width:100%;
+padding:8px;
+margin:5px 0;
+border-radius:10px;
+border:1px solid #ccc;
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:10px;
+background:#1a73e8;
+color:white;
+cursor:pointer;
+margin:2px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="dashboard">
+<h4>🚗 Driver Score</h4>
+<p>Deviation: <span id="dev">0</span></p>
+<p>Stops: <span id="stop">0</span></p>
+<p>Confusion: <span id="conf">0</span></p>
+<h4>Score: <span id="score">100</span></h4>
+</div>
+
+<div class="search-bar">
+<input id="start" placeholder="Start location">
+<input id="end" placeholder="Destination">
+
+<button onclick="getRoute()">Start</button>
+<button onclick="useMyLocation()">📍 My Location</button>
+<button onclick="searchCategory('fuel')">⛽ Petrol</button>
+<button onclick="searchCategory('atm')">🏧 ATM</button>
+</div>
+
+<div id="map"></div>
+
+<script>
+
+/* MAP */
+let map = L.map('map').setView([16.5,80.6],13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+attribution:'© OpenStreetMap'
+}).addTo(map);
+
+/* GLOBAL */
+let userLat=null,userLng=null;
+let routeLayer;
+let routeCoords=[];
+let lastPosition=null;
+
+let deviations=0, stops=0, confusion=0;
+
+/* ROUTE */
+async function getRoute(){
+
+let s=document.getElementById("start").value;
+let e=document.getElementById("end").value;
+
+if(!s || !e){
+alert("Enter locations");
+return;
+}
+
+let start = s.includes(",") ? s.split(",").map(Number) : await geo(s);
+let end   = e.includes(",") ? e.split(",").map(Number) : await geo(e);
+
+console.log("START:", start);
+console.log("END:", end);
+
+if(!start || !end){
+alert("Location not found");
+return;
+}
+
+if(window.sMarker) map.removeLayer(window.sMarker);
+if(window.eMarker) map.removeLayer(window.eMarker);
+
+window.sMarker = L.marker([start[1],start[0]])
+.addTo(map)
+.bindPopup("🚩 Start")
+.openPopup();
+
+window.eMarker = L.marker([end[1],end[0]])
+.addTo(map)
+.bindPopup("🏁 Destination");
+
+let res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
+method:"POST",
+headers:{
+"Authorization":"eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUyNjVjNzM5YjIyYjQyN2RhMjY2OGQ5NmNhNzQ1ODBiIiwiaCI6Im11cm11cjY0In0=",
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+coordinates:[
+[parseFloat(start[0]),parseFloat(start[1])],
+[parseFloat(end[0]),parseFloat(end[1])]
+]
+})
+});
+
+let data = await res.json();
+
+if(!data.features || data.features.length === 0){
+alert("Route failed");
+return;
+}
+
+if(routeLayer) map.removeLayer(routeLayer);
+
+routeLayer = L.geoJSON(data.features[0],{
+style:{color:"blue",weight:5}
+}).addTo(map);
+
+map.fitBounds(routeLayer.getBounds());
+
+routeCoords = data.features[0].geometry.coordinates.map(p=>[p[1],p[0]]);
+
+startTracking();
+}
+
+/* ✅ FIXED GEO ONLY */
+async function geo(place){
+try{
+
+// 1️⃣ Normal search
+let res = await fetch(
+`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}`
+);
+let data = await res.json();
+
+// 2️⃣ If not found → try simplified version
+if(!data || data.length === 0){
+
+let simple = place
+.replace(/women's|womens|college|university|institute/gi, "")
+.trim();
+
+res = await fetch(
+`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simple)}`
+);
+data = await res.json();
+}
+
+// 3️⃣ If still not found → force education keyword
+if(!data || data.length === 0){
+
+res = await fetch(
+`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place + " college")}`
+);
+data = await res.json();
+}
+
+// ❌ Still nothing
+if(!data || data.length === 0){
+alert("Location not found: " + place);
+return null;
+}
+
+// ✅ Pick best valid result
+let result = data.find(p => p.lat && p.lon) || data[0];
+
+let lon = parseFloat(result.lon);
+let lat = parseFloat(result.lat);
+
+// Safety check
+if(isNaN(lat) || isNaN(lon)){
+alert("Invalid location: " + place);
+return null;
+}
+
+return [lon, lat];
+
+}catch(e){
+console.log("Geo error:", e);
+return null;
+}
+}
+
+/* TRACKING */
+function startTracking(){
+
+navigator.geolocation.watchPosition(pos=>{
+
+let lat = pos.coords.latitude;
+let lng = pos.coords.longitude;
+
+userLat = lat;
+userLng = lng;
+
+if(!window.uMarker){
+window.uMarker = L.marker([lat,lng]).addTo(map);
+}else{
+window.uMarker.setLatLng([lat,lng]);
+}
+
+if(lastPosition){
+
+let d = map.distance(lastPosition,[lat,lng]);
+
+if(d > 80) deviations++;
+if(d < 5) stops++;
+
+if(pos.coords.speed !== null && pos.coords.speed < 2){
+confusion++;
+}
+}
+
+lastPosition=[lat,lng];
+
+updateDashboard();
+
+},{enableHighAccuracy:true});
+}
+
+/* DASHBOARD */
+function updateDashboard(){
+
+document.getElementById("dev").innerText = deviations;
+document.getElementById("stop").innerText = stops;
+document.getElementById("conf").innerText = confusion;
+
+let score = 100 - (deviations*5 + stops*3 + confusion*4);
+if(score < 0) score = 0;
+
+document.getElementById("score").innerText = score;
+
+/* ✅ ADD THIS PART */
+fetch('/save_behavior', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        deviations: deviations,
+        stops: stops,
+        confusion: confusion
+    })
+})
+.then(res => res.json())
+.then(data => {
+    console.log("Saved:", data);
+})
+.catch(err => {
+    console.log("Error:", err);
+});
+
+}
+
+
+/* CATEGORY */
+async function searchCategory(type){
+
+if(!userLat){
+alert("Click My Location first");
+return;
+}
+
+let query=`[out:json];node["amenity"="${type}"](around:200000,${userLat},${userLng});out;`;
+
+let res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query});
+let data=await res.json();
+
+data.elements.forEach(p=>{
+L.marker([p.lat,p.lon]).addTo(map).bindPopup(p.tags.name||type);
+});
+}
+
+/* LOCATION */
+function useMyLocation(){
+navigator.geolocation.getCurrentPosition(pos=>{
+userLat=pos.coords.latitude;
+userLng=pos.coords.longitude;
+
+document.getElementById("start").value = userLat+","+userLng;
+map.setView([userLat,userLng],15);
+});
+}
+
+
+</script>
+
+</body>
+</html>

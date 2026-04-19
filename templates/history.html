@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>History</title>
+</head>
+
+<body>
+
+<h2>📜 Ride History</h2>
+
+<table border="1">
+<tr>
+<th>ID</th>
+<th>Deviations</th>
+<th>Stops</th>
+<th>Score</th>
+<th>Type</th>
+</tr>
+
+{% for row in data %}
+<tr>
+<td>{{row[0]}}</td>
+<td>{{row[1]}}</td>
+<td>{{row[2]}}</td>
+<td>{{row[3]}}</td>
+<td>{{row[4]}}</td>
+</tr>
+{% endfor %}
+
+</table>
+
+</body>
+</html>
