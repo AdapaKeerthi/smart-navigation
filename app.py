@@ -17,7 +17,6 @@ def init_db():
         password TEXT
     )
     ''')
-    
 
     # driving data
     c.execute('''
@@ -161,11 +160,7 @@ def dashboard():
     return render_template('dashboard.html', data=rows)
 
 
-if __name__ == '__main__':
-    app.run(import os
-
-port = int(os.environ.get("PORT", 5000))
-app.run(host="0.0.0.0", port=port))
+# ================= ADMIN =================
 @app.route('/admin')
 def admin_panel():
 
@@ -189,3 +184,10 @@ def admin_panel():
     conn.close()
 
     return render_template('admin.html', users=users, data=data)
+
+
+# ✅ FIXED RENDER PORT ISSUE (ONLY IMPORTANT CHANGE)
+if __name__ == '__main__':
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
