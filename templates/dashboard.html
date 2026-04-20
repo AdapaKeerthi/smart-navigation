@@ -2,8 +2,13 @@
 <html>
 <head>
     <title>Driver Dashboard</title>
+
+    <!-- ✅ FIX: Chart.js should NOT be inside style -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body { font-family: Arial; background:#f5f5f5; padding:20px; }
+
         .card {
             background:white;
             padding:15px;
@@ -11,19 +16,106 @@
             border-radius:10px;
             box-shadow:0 2px 5px rgba(0,0,0,0.1);
         }
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        canvas {
+            margin-top:20px;
+            background:white;
+            padding:10px;
+            border-radius:10px;
+        }
     </style>
 </head>
+
 <body>
 
 <h2>🚗 Driver Behavior Dashboard</h2>
 
+<!-- ✅ EXISTING CARDS (FIXED INDEX) -->
 {% for d in data %}
 <div class="card">
-    <h3>Score: {{ d.score }}</h3>
-    <p>Type: {{ d.driver_type }}</p>
+    <h3>Score: {{ d[5] }}</h3>
+    <p>Type: {{ d[6] }}</p>
 </div>
 {% endfor %}
+
+<!-- ✅ NEW: GRAPH SECTION -->
+<h3>📊 Analytics</h3>
+
+<canvas id="devChart"></canvas>
+<canvas id="stopChart"></canvas>
+<canvas id="confChart"></canvas>
+<canvas id="scoreChart"></canvas>
+
+<!-- ✅ LIVE GRAPH SCRIPT -->
+<script>
+
+let devChart, stopChart, confChart, scoreChart;
+
+function createCharts(labels, deviations, stops, confusion, scores){
+
+    devChart = new Chart(document.getElementById("devChart"), {
+        type: "line",
+        data: { labels: labels, datasets: [{ label: "Deviations", data: deviations }] }
+    });
+
+    stopChart = new Chart(document.getElementById("stopChart"), {
+        type: "line",
+        data: { labels: labels, datasets: [{ label: "Stops", data: stops }] }
+    });
+
+    confChart = new Chart(document.getElementById("confChart"), {
+        type: "line",
+        data: { labels: labels, datasets: [{ label: "Confusion", data: confusion }] }
+    });
+
+    scoreChart = new Chart(document.getElementById("scoreChart"), {
+        type: "line",
+        data: { labels: labels, datasets: [{ label: "Score", data: scores }] }
+    });
+}
+
+function updateCharts(data){
+
+    let labels = data.map(d => d.time);
+    let deviations = data.map(d => d.deviations);
+    let stops = data.map(d => d.stops);
+    let confusion = data.map(d => d.confusion);
+    let scores = data.map(d => d.score);
+
+    if(!devChart){
+        createCharts(labels, deviations, stops, confusion, scores);
+    } else {
+        devChart.data.labels = labels;
+        devChart.data.datasets[0].data = deviations;
+        devChart.update();
+
+        stopChart.data.labels = labels;
+        stopChart.data.datasets[0].data = stops;
+        stopChart.update();
+
+        confChart.data.labels = labels;
+        confChart.data.datasets[0].data = confusion;
+        confChart.update();
+
+        scoreChart.data.labels = labels;
+        scoreChart.data.datasets[0].data = scores;
+        scoreChart.update();
+    }
+}
+
+// 🔄 AUTO FETCH EVERY 5 SECONDS
+function fetchData(){
+    fetch('/api/data')
+    .then(res => res.json())
+    .then(data => {
+        updateCharts(data);
+    });
+}
+
+fetchData();
+setInterval(fetchData, 5000);
+
+</script>
 
 </body>
 </html>

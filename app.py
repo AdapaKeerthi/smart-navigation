@@ -1,15 +1,15 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
 import sqlite3
+from model import model   # ✅ ADDED (AI)
 
 app = Flask(__name__)
-app.secret_key = "secret123"  # needed for login session
+app.secret_key = "secret123"
 
 # ================= DATABASE =================
 def init_db():
     conn = sqlite3.connect('drivers.db')
     c = conn.cursor()
 
-    # users table
     c.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,7 +18,6 @@ def init_db():
     )
     ''')
 
-    # driving data
     c.execute('''
     CREATE TABLE IF NOT EXISTS driving_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,14 +115,12 @@ def save_behavior():
     stops = data.get('stops', 0)
     confusion = data.get('confusion', 0)
 
+    # Score remains same (no breaking change)
     score = 100 - (deviations*5 + stops*3 + confusion*4)
 
-    if score > 80:
-        driver_type = "Safe Driver"
-    elif score > 50:
-        driver_type = "Average Driver"
-    else:
-        driver_type = "Risky Driver"
+    # ✅ AI Prediction (NEW)
+    prediction = model.predict([[deviations, stops, confusion]])
+    driver_type = prediction[0]
 
     conn = sqlite3.connect('drivers.db')
     c = conn.cursor()
@@ -160,6 +157,8 @@ def dashboard():
     return render_template('dashboard.html', data=rows)
 
 
+
+
 # ================= ADMIN =================
 @app.route('/admin')
 def admin_panel():
@@ -186,7 +185,7 @@ def admin_panel():
     return render_template('admin.html', users=users, data=data)
 
 
-# ✅ FIXED RENDER PORT ISSUE (ONLY IMPORTANT CHANGE)
+# ================= RUN =================
 if __name__ == '__main__':
     import os
     port = int(os.environ.get("PORT", 5000))

@@ -2,13 +2,26 @@ from sklearn.ensemble import RandomForestClassifier
 
 model = RandomForestClassifier()
 
-model.fit(
-    [
-        [0, 0],
-        [1, 1],
-        [2, 1],
-        [3, 2],
-        [4, 3]
-    ],
-    ["safe", "normal", "careful", "risky", "very risky"]
-)
+# Training data (deviation, stops, confusion)
+X = [
+    [0,0,0],
+    [1,0,0],
+    [2,1,0],
+    [3,1,1],
+    [4,2,1],
+    [5,3,2],
+    [6,3,3]
+]
+
+# Labels
+y = [
+    "Safe Driver",
+    "Safe Driver",
+    "Average Driver",
+    "Average Driver",
+    "Risky Driver",
+    "Risky Driver",
+    "Dangerous Driver"
+]
+
+model.fit(X, y)
