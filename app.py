@@ -141,7 +141,7 @@ def save_behavior():
         score = 0
 
     # ✅ AI Prediction
-   if model:
+if model:
     prediction = model.predict([[deviations, stops, confusion]])
     driver_type = prediction[0]
 else:
