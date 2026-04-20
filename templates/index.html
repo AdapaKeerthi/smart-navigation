@@ -261,7 +261,7 @@ navigator.geolocation.watchPosition(pos=>{
 let lat = pos.coords.latitude;
 let lng = pos.coords.longitude;
 
-let heading = position.coords.heading || 0;
+let heading = pos.coords.heading || 0;
 
 if (heading > 60) {
     showWarning("⚠️ Wrong Route!");
@@ -329,13 +329,13 @@ fetch('/save_behavior', {
         'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-        deviations: deviations,
-        stops: stops,
-        confusion: confusion
+        deviations,
+        stops,
+        confusion
     })
 })
 .then(res => res.json())
-.then(data => {
+.then(daa => {
     console.log("Saved:", data);
 })
 .catch(err => {
@@ -378,4 +378,4 @@ map.setView([userLat,userLng],15);
 </script>
 
 </body>
-</html>
+</html>t
