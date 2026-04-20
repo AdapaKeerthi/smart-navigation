@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
 import os
 import psycopg2
+import sqlite3   # ✅ ADD THIS
 from model import model   # AI model
 
 app = Flask(__name__)
