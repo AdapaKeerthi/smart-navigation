@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
 import os
 import psycopg2
+
 try:
     from model import model
 except:
@@ -140,12 +141,12 @@ def save_behavior():
     if score < 0:
         score = 0
 
-    # ✅ AI Prediction
-if model:
-    prediction = model.predict([[deviations, stops, confusion]])
-    driver_type = prediction[0]
-else:
-    driver_type = "Normal"
+    # ✅ AI Prediction (FIXED)
+    if model:
+        prediction = model.predict([[deviations, stops, confusion]])
+        driver_type = prediction[0]
+    else:
+        driver_type = "Normal"
 
     conn = get_db()
     c = conn.cursor()
