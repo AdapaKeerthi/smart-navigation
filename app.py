@@ -1,14 +1,20 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
 import os
 import psycopg2
-from model import model   # ✅ AI model
+try:
+    from model import model
+except:
+    model = None   # ✅ AI model
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
 # ================= DATABASE CONNECTION =================
 def get_db():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+    return psycopg2.connect(
+        os.environ.get("DATABASE_URL"),
+        sslmode='require'
+    )
 
 # ================= INIT TABLES =================
 def init_db():
@@ -135,8 +141,11 @@ def save_behavior():
         score = 0
 
     # ✅ AI Prediction
+   if model:
     prediction = model.predict([[deviations, stops, confusion]])
     driver_type = prediction[0]
+else:
+    driver_type = "Normal"
 
     conn = get_db()
     c = conn.cursor()
