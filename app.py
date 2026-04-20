@@ -1,48 +1,55 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
 import os
 import psycopg2
-import sqlite3   # ✅ ADD THIS
-from model import model   # AI model
+from model import model   # ✅ AI model
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-# ================= DATABASE (POSTGRESQL) =================
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# ================= DATABASE CONNECTION =================
+def get_db():
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
 
-conn = psycopg2.connect(DATABASE_URL)
-conn.autocommit = True
-cursor = conn.cursor()
+# ================= INIT TABLES =================
+def init_db():
+    conn = get_db()
+    c = conn.cursor()
 
-# Create tables
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username TEXT UNIQUE,
-    password TEXT
-)
-""")
+    # Users table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT
+    )
+    """)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS driving_data (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER,
-    deviations INTEGER,
-    stops INTEGER,
-    confusion INTEGER,
-    score INTEGER,
-    driver_type TEXT,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
+    # Driving data table
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS driving_data (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        deviations INTEGER,
+        stops INTEGER,
+        confusion INTEGER,
+        score INTEGER,
+        driver_type TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
-# Insert admin user (only once)
-cursor.execute("""
-INSERT INTO users (id, username, password)
-VALUES (999, 'admin', 'admin123')
-ON CONFLICT (id) DO NOTHING
-""")
-# ========================================================
+    # Admin user
+    c.execute("""
+    INSERT INTO users (id, username, password)
+    VALUES (999, 'admin', 'admin123')
+    ON CONFLICT (id) DO NOTHING
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_db()
+# =======================================================
 
 
 @app.route('/')
@@ -59,14 +66,17 @@ def register():
         u = request.form['username']
         p = request.form['password']
 
+        conn = get_db()
+        c = conn.cursor()
+
         try:
-            cursor.execute(
-                "INSERT INTO users (username,password) VALUES (%s,%s)",
-                (u,p)
-            )
+            c.execute("INSERT INTO users (username,password) VALUES (%s,%s)", (u,p))
+            conn.commit()
         except:
+            conn.close()
             return "User already exists"
 
+        conn.close()
         return redirect('/login')
 
     return render_template('register.html')
@@ -79,11 +89,16 @@ def login():
         u = request.form['username']
         p = request.form['password']
 
-        cursor.execute(
+        conn = get_db()
+        c = conn.cursor()
+
+        c.execute(
             "SELECT * FROM users WHERE username=%s AND password=%s",
             (u,p)
         )
-        user = cursor.fetchone()
+        user = c.fetchone()
+
+        conn.close()
 
         if user:
             session['user_id'] = user[0]
@@ -114,17 +129,26 @@ def save_behavior():
     stops = data.get('stops', 0)
     confusion = data.get('confusion', 0)
 
+    # Score calculation
     score = 100 - (deviations*5 + stops*3 + confusion*4)
+    if score < 0:
+        score = 0
 
-    # AI Prediction
+    # ✅ AI Prediction
     prediction = model.predict([[deviations, stops, confusion]])
     driver_type = prediction[0]
 
-    cursor.execute("""
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute("""
     INSERT INTO driving_data 
     (user_id, deviations, stops, confusion, score, driver_type)
     VALUES (%s, %s, %s, %s, %s, %s)
     """, (session['user_id'], deviations, stops, confusion, score, driver_type))
+
+    conn.commit()
+    conn.close()
 
     return jsonify({"score":score,"driver_type":driver_type})
 
@@ -136,11 +160,16 @@ def dashboard():
     if 'user_id' not in session:
         return redirect('/login')
 
-    cursor.execute(
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute(
         "SELECT * FROM driving_data WHERE user_id=%s ORDER BY timestamp DESC",
         (session['user_id'],)
     )
-    rows = cursor.fetchall()
+    rows = c.fetchall()
+
+    conn.close()
 
     return render_template('dashboard.html', data=rows)
 
@@ -152,10 +181,13 @@ def admin_panel():
     if 'user_id' not in session or session['user_id'] != 999:
         return "Access Denied"
 
-    cursor.execute("SELECT id, username FROM users")
-    users = cursor.fetchall()
+    conn = get_db()
+    c = conn.cursor()
 
-    cursor.execute("""
+    c.execute("SELECT id, username FROM users")
+    users = c.fetchall()
+
+    c.execute("""
         SELECT users.username, driving_data.deviations, driving_data.stops,
                driving_data.confusion, driving_data.score, driving_data.driver_type,
                driving_data.timestamp
@@ -163,7 +195,9 @@ def admin_panel():
         JOIN users ON users.id = driving_data.user_id
         ORDER BY driving_data.timestamp DESC
     """)
-    data = cursor.fetchall()
+    data = c.fetchall()
+
+    conn.close()
 
     return render_template('admin.html', users=users, data=data)
 
