@@ -3,8 +3,8 @@ import os
 import psycopg2
 from model import model
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -14,9 +14,9 @@ def get_db():
     DATABASE_URL = os.environ.get("DATABASE_URL")
 
     if not DATABASE_URL:
-        raise Exception("❌ DATABASE_URL not set. Set it before running.")
+        raise Exception("❌ DATABASE_URL not set")
 
-    # Fix for Render (postgres:// → postgresql://)
+    # Fix for Render
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -60,13 +60,18 @@ def init_db():
         conn.commit()
         conn.close()
 
-        print("✅ Database connected & initialized")
+        print("✅ DB READY")
 
     except Exception as e:
         print("❌ DB ERROR:", e)
 
 
-init_db()
+# ⚠️ IMPORTANT: DO NOT crash app if DB fails
+try:
+    init_db()
+except:
+    print("⚠️ DB skipped during startup")
+
 
 # ================= ROUTES =================
 @app.route('/')
@@ -170,7 +175,8 @@ def dashboard():
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT * FROM driving_data
+    SELECT deviations, stops, confusion, score, driver_type, timestamp
+    FROM driving_data
     WHERE user_id=%s
     ORDER BY timestamp DESC
     """,(session['user_id'],))
@@ -180,18 +186,23 @@ def dashboard():
 
     return render_template('dashboard.html', data=data)
 
-#=============LIVE DATA===========
+
+# ================= LIVE DATA =================
 @app.route('/live_data')
 def live_data():
     conn = get_db()
     cur = conn.cursor()
 
+    # ✅ IMPORTANT FIX: ONLY LATEST DATA PER USER
     cur.execute("""
-    SELECT users.username, driving_data.score,
-           driving_data.latitude, driving_data.longitude
+    SELECT DISTINCT ON (users.username)
+        users.username,
+        driving_data.score,
+        driving_data.latitude,
+        driving_data.longitude
     FROM driving_data
     JOIN users ON users.id = driving_data.user_id
-    ORDER BY driving_data.timestamp DESC
+    ORDER BY users.username, driving_data.timestamp DESC
     """)
 
     rows = cur.fetchall()
@@ -203,13 +214,14 @@ def live_data():
         data.append({
             "username": r[0],
             "score": r[1],
-            "lat": r[2],
-            "lon": r[3]
+            "lat": r[2] if r[2] else 17.38,
+            "lon": r[3] if r[3] else 78.48
         })
 
     return jsonify(data)
 
-# ================= ROUTE TYPE (ADD HERE) =================
+
+# ================= ROUTE TYPE =================
 @app.route('/get_route_type')
 def get_route_type():
 
@@ -225,7 +237,6 @@ def get_route_type():
     """, (session['user_id'],))
 
     avg_score = cur.fetchone()[0]
-
     conn.close()
 
     if avg_score is None:
@@ -237,6 +248,7 @@ def get_route_type():
         return jsonify({"type":"normal"})
     else:
         return jsonify({"type":"risky"})
+
 
 # ================= ADMIN =================
 @app.route('/admin')
@@ -263,7 +275,9 @@ def admin():
     conn.close()
 
     return render_template('admin.html', users=users, data=data)
-#=============USER DETAIL========
+
+
+# ================= USER DETAIL =================
 @app.route('/user/<username>')
 def user_detail(username):
 
@@ -273,7 +287,6 @@ def user_detail(username):
     conn = get_db()
     cur = conn.cursor()
 
-    # Get user id
     cur.execute("SELECT id FROM users WHERE username=%s", (username,))
     user = cur.fetchone()
 
@@ -282,7 +295,6 @@ def user_detail(username):
 
     user_id = user[0]
 
-    # Get driving data
     cur.execute("""
     SELECT deviations, stops, confusion, score, driver_type, timestamp
     FROM driving_data
