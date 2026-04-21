@@ -1,25 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Driver Dashboard</title>
+    <title>User Detail</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body{
-            font-family: Arial;
+            font-family:Arial;
             background:#f5f6fa;
-            margin:0;
             padding:20px;
-        }
-
-        h2{
-            text-align:center;
         }
 
         .card{
             background:white;
-            padding:20px;
+            padding:15px;
             border-radius:10px;
             margin-bottom:20px;
             box-shadow:0 2px 8px rgba(0,0,0,0.1);
@@ -37,20 +32,12 @@
         }
 
         th{
-            background:#2d3436;
+            background:#2c3e50;
             color:white;
-        }
-
-        .top{
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            margin-bottom:10px;
         }
 
         a{
             text-decoration:none;
-            color:#0984e3;
             font-weight:bold;
         }
     </style>
@@ -58,19 +45,18 @@
 
 <body>
 
-<div class="top">
-    <h2>📊 Driver Dashboard</h2>
-    <a href="/">⬅ Back</a>
-</div>
+<h2>👤 {{ username }} - Full Analysis</h2>
 
-<!-- ================= GRAPH ================= -->
+<a href="/admin">⬅ Back to Admin</a>
+
+<!-- GRAPH -->
 <div class="card">
     <canvas id="chart"></canvas>
 </div>
 
-<!-- ================= TABLE ================= -->
+<!-- TABLE -->
 <div class="card">
-    <h3>📋 Driving History</h3>
+    <h3>Driving History</h3>
 
     <table>
         <tr>
@@ -84,37 +70,32 @@
 
         {% for row in data %}
         <tr>
+            <td>{{ row[0] }}</td>
+            <td>{{ row[1] }}</td>
             <td>{{ row[2] }}</td>
             <td>{{ row[3] }}</td>
             <td>{{ row[4] }}</td>
             <td>{{ row[5] }}</td>
-            <td>{{ row[6] }}</td>
-            <td>{{ row[7] }}</td>
         </tr>
         {% endfor %}
-
     </table>
 </div>
 
-<!-- ================= SCRIPT ================= -->
 <script>
-    // FIXED: using |tojson (important)
+let scores = {{ data | map(attribute=3) | list | tojson }};
+let labels = {{ data | map(attribute=5) | list | tojson }};
 
-    let scores = {{ data | map(attribute=5) | list | tojson }};
-    let labels = {{ data | map(attribute=7) | list | tojson }};
-
-    new Chart(document.getElementById("chart"), {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Score",
-                data: scores,
-                fill: false,
-                tension: 0.3
-            }]
-        }
-    });
+new Chart(document.getElementById("chart"), {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Score',
+            data: scores,
+            tension:0.3
+        }]
+    }
+});
 </script>
 
 </body>

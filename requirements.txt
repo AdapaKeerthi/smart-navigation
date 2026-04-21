@@ -1,4 +1,4 @@
 Flask
-gunicorn
-scikit-learn
 psycopg2-binary
+scikit-learn
+gunicorn

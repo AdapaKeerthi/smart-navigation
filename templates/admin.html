@@ -1,43 +1,258 @@
-<h2>👨‍💻 Admin Panel</h2>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Navigation - Admin Control</title>
 
-<h3>Users</h3>
-<table border="1">
-<tr><th>ID</th><th>Username</th></tr>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-{% for u in users %}
-<tr>
-<td>{{u[0]}}</td>
-<td>{{u[1]}}</td>
-</tr>
-{% endfor %}
+    <style>
+        body{
+            margin:0;
+            font-family: 'Segoe UI', sans-serif;
+            background:#f4f6f9;
+        }
 
-</table>
+        #map{
+            height:100vh;
+        }
 
-<br><br>
+        /* TOP BAR */
+        .top{
+            position:absolute;
+            top:15px;
+            left:50%;
+            transform:translateX(-50%);
+            background:white;
+            padding:12px 25px;
+            border-radius:12px;
+            z-index:1000;
+            box-shadow:0 4px 15px rgba(0,0,0,0.2);
+            display:flex;
+            gap:20px;
+            align-items:center;
+        }
 
-<h3>Driving Data</h3>
-<table border="1">
+        .badge{
+            padding:5px 10px;
+            border-radius:8px;
+            font-size:12px;
+            font-weight:bold;
+        }
 
-<tr>
-<th>User</th>
-<th>Deviation</th>
-<th>Stops</th>
-<th>Confusion</th>
-<th>Score</th>
-<th>Type</th>
-<th>Time</th>
-</tr>
+        .green{background:#2ecc71;color:white;}
+        .orange{background:#f39c12;color:white;}
+        .red{background:#e74c3c;color:white;}
 
-{% for d in data %}
-<tr>
-<td>{{d[0]}}</td>
-<td>{{d[1]}}</td>
-<td>{{d[2]}}</td>
-<td>{{d[3]}}</td>
-<td>{{d[4]}}</td>
-<td>{{d[5]}}</td>
-<td>{{d[6]}}</td>
-</tr>
-{% endfor %}
+        /* ALERT PANEL */
+        .alerts{
+            position:absolute;
+            bottom:20px;
+            left:20px;
+            background:white;
+            padding:15px;
+            border-radius:12px;
+            width:300px;
+            z-index:1000;
+            box-shadow:0 4px 15px rgba(0,0,0,0.2);
+            max-height:350px;
+            overflow-y:auto;
+        }
 
-</table>
+        .alert{
+            padding:10px;
+            margin-bottom:6px;
+            border-radius:8px;
+            font-size:13px;
+        }
+
+        .danger{background:#ff4d4d;color:white;}
+        .warning{background:#ffeaa7;}
+        .safe{background:#55efc4;}
+
+        /* SIDE PANEL */
+        .side{
+            position:absolute;
+            right:20px;
+            top:80px;
+            background:white;
+            padding:15px;
+            border-radius:12px;
+            width:260px;
+            z-index:1000;
+            box-shadow:0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .stat{
+            margin-bottom:10px;
+            font-size:14px;
+        }
+
+        a{
+            text-decoration:none;
+            font-weight:bold;
+            color:#2c3e50;
+        }
+
+        /* BLINK */
+        .blink{
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%{opacity:1;}
+            50%{opacity:0.3;}
+            100%{opacity:1;}
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div class="side" style="top:20px; right:20px;">
+    <h4>👤 Registered Users</h4>
+
+    {% for user in users %}
+        <div>
+    • <a href="/user/{{ user[1] }}">{{ user[1] }}</a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- TOP -->
+<div class="top">
+    👨‍💼 <b>Admin Live Control</b>
+    <a href="/">Home</a>
+    <span>Total Users: {{ users|length }}</span>
+</div>
+
+<!-- ALERTS -->
+<div class="alerts" id="alerts">
+    <b>🚨 Live Alerts</b>
+</div>
+
+<!-- SIDE ANALYTICS -->
+<div class="side">
+    <div class="stat">🟢 Safe Users: <b id="safe">0</b></div>
+    <div class="stat">🟡 Medium Risk: <b id="medium">0</b></div>
+    <div class="stat">🔴 Danger Users: <b id="danger">0</b></div>
+    <hr>
+    <div class="stat">📊 Avg Score: <b id="avg">0</b></div>
+</div>
+
+<script>
+let map = L.map('map').setView([17.3850,78.4867], 12);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let markers = {};
+
+async function loadLive(){
+
+    let res = await fetch('/live_data');
+    let data = await res.json();
+
+    let alertBox = document.getElementById("alerts");
+    alertBox.innerHTML = "<b>🚨 Live Alerts</b>";
+
+    document.getElementById("userCount").innerText = "Users: " + data.length;
+
+    let safe=0, medium=0, danger=0, totalScore=0;
+
+    let activeUsers = {};
+
+    let selectedUser = new URLSearchParams(window.location.search).get("user");
+
+    data.forEach(user=>{
+
+    if(selectedUser && user.username !== selectedUser){
+        return;
+    }
+
+        activeUsers[user.username] = true;
+        totalScore += user.score;
+
+        let color = "green";
+
+        if(user.score < 50){
+            color="red"; danger++;
+        }
+        else if(user.score < 70){
+            color="orange"; medium++;
+        }
+        else{
+            safe++;
+        }
+
+        // MARKER
+        if(!markers[user.username]){
+            markers[user.username] = L.circleMarker(
+                [user.lat, user.lon],
+                {
+                    radius:10,
+                    color:color,
+                    fillOpacity:0.8
+                }
+            ).addTo(map);
+        } else {
+            markers[user.username].setLatLng([user.lat,user.lon]);
+            markers[user.username].setStyle({color:color});
+        }
+
+        // POPUP
+        markers[user.username].bindPopup(`
+            <b>${user.username}</b><br>
+            Score: ${user.score}<br>
+            Status: ${color.toUpperCase()}
+        `);
+
+        // BLINK DANGER
+        let el = markers[user.username]._path;
+        if(el){
+            el.classList.remove("blink");
+            if(user.score < 50){
+                el.classList.add("blink");
+            }
+        }
+
+        // ALERTS
+        if(user.score < 50){
+            alertBox.innerHTML += 
+            `<div class="alert danger">🔴 ${user.username} - Critical (${user.score})</div>`;
+        }
+        else if(user.score < 70){
+            alertBox.innerHTML += 
+            `<div class="alert warning">🟡 ${user.username} - Risk (${user.score})</div>`;
+        }
+        else{
+            alertBox.innerHTML += 
+            `<div class="alert safe">🟢 ${user.username} - Safe (${user.score})</div>`;
+        }
+    });
+
+    // REMOVE OLD USERS
+    for(let u in markers){
+        if(!activeUsers[u]){
+            map.removeLayer(markers[u]);
+            delete markers[u];
+        }
+    }
+
+    // UPDATE ANALYTICS
+    document.getElementById("safe").innerText = safe;
+    document.getElementById("medium").innerText = medium;
+    document.getElementById("danger").innerText = danger;
+
+    let avg = data.length ? (totalScore/data.length).toFixed(1) : 0;
+    document.getElementById("avg").innerText = avg;
+}
+
+// AUTO REFRESH
+setInterval(loadLive, 4000);
+loadLive();
+</script>
+
+</body>
+</html>
