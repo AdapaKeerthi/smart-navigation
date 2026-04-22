@@ -85,10 +85,13 @@ except:
 # ================= ROUTES =================
 @app.route('/')
 def home():
+    return redirect('/register')
+
+@app.route('/map')
+def map_page():
     if 'user_id' not in session:
         return redirect('/login')
     return render_template('index.html')
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -112,7 +115,7 @@ def login():
 
         if user:
             session['user_id'] = user[0]   # ✅ FIXED (session set)
-            return redirect('/')
+            return redirect('/map')
         else:
             return "Invalid credentials"
 
@@ -148,11 +151,17 @@ def register():
 
     return render_template('register.html')
 
+@app.route('/reset')
+def reset():
+    session.clear()
+    return "Session cleared"
+
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/login')
+
 
 
 # ================= SAVE =================
