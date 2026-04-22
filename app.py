@@ -96,19 +96,28 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        conn = get_db_connection()
-        user = conn.execute(
-            "SELECT * FROM users WHERE username=? AND password=?",
+        conn = get_db()   # ✅ FIXED
+        if not conn:
+            return "DB error"
+
+        cur = conn.cursor()
+
+        cur.execute(
+            "SELECT id FROM users WHERE username=%s AND password=%s",  # ✅ FIXED
             (username, password)
-        ).fetchone()
+        )
+
+        user = cur.fetchone()
         conn.close()
 
         if user:
+            session['user_id'] = user[0]   # ✅ FIXED (session set)
             return redirect(f"/user/{username}")
         else:
             return "Invalid credentials"
 
     return render_template('login.html')
+
 
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -166,6 +175,9 @@ def save_behavior():
     driver_type = prediction[0]
 
     conn = get_db()
+    if not conn:
+        return jsonify({"error":"DB error"})   # ✅ FIXED
+
     cur = conn.cursor()
 
     cur.execute("""
@@ -207,7 +219,6 @@ def live_data():
     conn = get_db()
     cur = conn.cursor()
 
-    # ✅ IMPORTANT FIX: ONLY LATEST DATA PER USER
     cur.execute("""
     SELECT DISTINCT ON (users.username)
         users.username,
