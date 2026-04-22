@@ -53,7 +53,7 @@ padding:12px;border-radius:10px;font-size:14px;
 
 <body>
 
-<div id="map"></div>
+
 
 <div class="search-box">
 <input id="start" placeholder="Start location">
@@ -93,26 +93,56 @@ let userMarker;
 let routeLine;
 let routeCoords = [];
 let rerouting = false;
+let started = false;
+let lastLat = null;
+let lastLon = null;
+let warningGiven = false;
+let lastUpdate = 0;
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    let R = 6371;
+    let dLat = (lat2 - lat1) * Math.PI / 180;
+    let dLon = (lon2 - lon1) * Math.PI / 180;
+
+    let a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
 
 /* 📍 GPS */
-navigator.geolocation.watchPosition(pos=>{
-    let lat = pos.coords.latitude;
-    let lon = pos.coords.longitude;
+navigator.geolocation.watchPosition(function(position) {
 
-    if(!userMarker){
-        userMarker = L.marker([lat,lon]).addTo(map);
-    }else{
-        userMarker.setLatLng([lat,lon]);
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+
+    // first position → do nothing
+    if (lastLat === null) {
+        lastLat = lat;
+        lastLon = lon;
+        return;
     }
 
-    map.setView([lat,lon],13);
+    let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
 
-    if(routeCoords.length){
-        checkDeviation(lat,lon);
+    // start navigation ONLY after movement
+    if (!started && distanceMoved > 0.02) {
+        started = true;
+        speak("Navigation started");
+        console.log("Navigation started");
     }
 
-    // ✅ LIVE SAVE (dashboard safe)
-    saveBehavior(lat, lon);
+    if (!started) return;
+
+    // your existing route logic
+    checkRoute(lat, lon);
+
+    lastLat = lat;
+    lastLon = lon;
 
 });
 
@@ -177,22 +207,18 @@ async function startNav(){
 }
 
 /* 🚨 WRONG ROUTE */
-function checkDeviation(lat,lon){
+function checkRoute(lat, lon) {
 
-    let minDist = Infinity;
+    let offRoute = isOffRoute(lat, lon); // your logic
 
-    routeCoords.forEach(coord=>{
-        let d = map.distance([lat,lon],[coord[1],coord[0]]);
-        if(d < minDist) minDist = d;
-    });
-
-    if(minDist > 100 && !rerouting){
-        rerouting = true;
-
+    if (offRoute && !warningGiven) {
+        speak("You are going in wrong route");
         alert("⚠️ You are off route!");
-        speak("You are going wrong route");
+        warningGiven = true;
+    }
 
-        reroute(lat,lon);
+    if (!offRoute) {
+        warningGiven = false;
     }
 }
 
