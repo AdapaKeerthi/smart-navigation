@@ -41,7 +41,17 @@ def init_db():
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             deviations INTEGER,
-            stops INTEGER,
+               p = request.form['password']
+
+        conn = get_db()
+        c = conn.cursor()
+
+        try:
+            c.execute("INSERT INTO users(username,password) VALUES(%s,%s)",(u,p))
+            conn.commit()
+        except:
+            conn.close()
+            return "User exi   stops INTEGER,
             confusion INTEGER,
             score INTEGER,
             driver_type TEXT,
@@ -87,18 +97,23 @@ def register():
         u = request.form['username']
         p = request.form['password']
 
-        conn = get_db()
-        c = conn.cursor()
-
         try:
-            c.execute("INSERT INTO users(username,password) VALUES(%s,%s)",(u,p))
-            conn.commit()
-        except:
-            conn.close()
-            return "User exists"
+            conn = get_db()
+            c = conn.cursor()
 
-        conn.close()
-        return redirect('/login')
+            c.execute(
+                "INSERT INTO users(username,password) VALUES(%s,%s)",
+                (u,p)
+            )
+
+            conn.commit()
+            conn.close()
+
+            return redirect('/login')
+
+        except Exception as e:
+            print("REGISTER ERROR:", e)   # 🔥 THIS WILL SHOW REAL ERROR IN LOGS
+            return "Registration failed: " + str(e)
 
     return render_template('register.html')
 
