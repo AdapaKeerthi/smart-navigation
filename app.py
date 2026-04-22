@@ -112,7 +112,7 @@ def login():
 
         if user:
             session['user_id'] = user[0]   # ✅ FIXED (session set)
-            return redirect(f"/user/{username}")
+            return redirect('/')
         else:
             return "Invalid credentials"
 
