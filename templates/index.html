@@ -54,7 +54,7 @@ padding:12px;border-radius:10px;font-size:14px;
 <body>
 
 
-
+<div id="map"></div>
 <div class="search-box">
 <input id="start" placeholder="Start location">
 <input id="end" placeholder="Destination">
@@ -286,11 +286,6 @@ function findPlace(type){
     alert("Showing nearby "+type);
 }
 
-var map = L.map('map').setView([17.3850, 78.4867], 13);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
 </script>
 
 </body>
