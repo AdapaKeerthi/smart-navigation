@@ -14,18 +14,27 @@ def get_db():
     DATABASE_URL = os.environ.get("DATABASE_URL")
 
     if not DATABASE_URL:
-        raise Exception("❌ DATABASE_URL not set")
+        print("❌ DATABASE_URL missing")
+        return None
 
-    # Fix for Render
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
+    try:
+        return psycopg2.connect(DATABASE_URL, sslmode='require')
+    except Exception as e:
+        print("❌ DB CONNECTION ERROR:", e)
+        return None
 
 
 def init_db():
+    conn = get_db()
+
+    if not conn:
+        print("❌ Skipping DB init")
+        return
+
     try:
-        conn = get_db()
         c = conn.cursor()
 
         c.execute("""
@@ -41,17 +50,7 @@ def init_db():
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             deviations INTEGER,
-               p = request.form['password']
-
-        conn = get_db()
-        c = conn.cursor()
-
-        try:
-            c.execute("INSERT INTO users(username,password) VALUES(%s,%s)",(u,p))
-            conn.commit()
-        except:
-            conn.close()
-            return "User exi   stops INTEGER,
+            stops INTEGER,
             confusion INTEGER,
             score INTEGER,
             driver_type TEXT,
@@ -70,10 +69,10 @@ def init_db():
         conn.commit()
         conn.close()
 
-        print("✅ DB READY")
+        print("✅ DB initialized")
 
     except Exception as e:
-        print("❌ DB ERROR:", e)
+        print("❌ INIT DB ERROR:", e)
 
 
 # ⚠️ IMPORTANT: DO NOT crash app if DB fails
@@ -99,6 +98,9 @@ def register():
 
         try:
             conn = get_db()
+            if not conn:
+                return "DB connection failed"
+
             c = conn.cursor()
 
             c.execute(
@@ -112,33 +114,10 @@ def register():
             return redirect('/login')
 
         except Exception as e:
-            print("REGISTER ERROR:", e)   # 🔥 THIS WILL SHOW REAL ERROR IN LOGS
-            return "Registration failed: " + str(e)
+            print("REGISTER ERROR:", e)
+            return "Registration failed"
 
     return render_template('register.html')
-
-
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method == 'POST':
-        u = request.form['username']
-        p = request.form['password']
-
-        conn = get_db()
-        c = conn.cursor()
-
-        c.execute("SELECT * FROM users WHERE username=%s AND password=%s",(u,p))
-        user = c.fetchone()
-
-        conn.close()
-
-        if user:
-            session['user_id'] = user[0]
-            return redirect('/')
-        else:
-            return "Invalid login"
-
-    return render_template('login.html')
 
 
 @app.route('/logout')
