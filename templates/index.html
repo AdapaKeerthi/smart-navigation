@@ -9,104 +9,51 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
     <style>
-        body{
-            margin:0;
-            font-family: Arial;
-        }
+        body{margin:0;font-family: Arial;}
+        #map{height:100vh;width:100%;}
 
-        #map{
-            height:100vh;
-            width:100%;
-        }
-
-        /* TOP SEARCH BOX */
         .search-box{
-            position:absolute;
-            top:20px;
-            left:50%;
+            position:absolute;top:20px;left:50%;
             transform:translateX(-50%);
-            background:white;
-            padding:15px;
-            border-radius:12px;
+            background:white;padding:15px;border-radius:12px;
             box-shadow:0 4px 15px rgba(0,0,0,0.2);
-            width:300px;
-            z-index:1000;
+            width:300px;z-index:1000;
         }
 
-        .search-box input, .search-box select{
-            width:100%;
-            padding:10px;
-            margin:6px 0;
-            border-radius:8px;
-            border:1px solid #ccc;
+        .search-box input,.search-box select{
+            width:100%;padding:10px;margin:6px 0;
+            border-radius:8px;border:1px solid #ccc;
         }
 
         .search-box button{
-            width:100%;
-            padding:12px;
-            margin-top:8px;
-            background:#1a73e8;
-            color:white;
-            border:none;
-            border-radius:8px;
-            font-size:15px;
-            font-weight:bold;
-            cursor:pointer;
+            width:100%;padding:12px;margin-top:8px;
+            background:#1a73e8;color:white;border:none;
+            border-radius:8px;font-weight:bold;cursor:pointer;
         }
 
-        /* FLOATING BUTTONS */
         .floating{
-            position:absolute;
-            bottom:20px;
-            right:20px;
-            display:flex;
-            flex-direction:column;
-            gap:10px;
+            position:absolute;bottom:20px;right:20px;
+            display:flex;flex-direction:column;gap:10px;
             z-index:1000;
         }
 
         .floating button{
-            width:55px;
-            height:55px;
-            border-radius:50%;
-            border:none;
-            font-size:18px;
-            background:#1a73e8;
-            color:white;
-            cursor:pointer;
-            box-shadow:0 3px 10px rgba(0,0,0,0.3);
+            width:55px;height:55px;border-radius:50%;
+            border:none;background:#1a73e8;color:white;
         }
 
-        /* TOP RIGHT MENU */
         .top-menu{
-            position:absolute;
-            top:20px;
-            right:20px;
-            z-index:1000;
+            position:absolute;top:20px;right:20px;z-index:1000;
         }
 
         .top-menu a{
-            margin-left:10px;
-            text-decoration:none;
-            background:white;
-            padding:8px 12px;
-            border-radius:8px;
-            box-shadow:0 2px 6px rgba(0,0,0,0.2);
-            color:#333;
-            font-weight:bold;
+            margin-left:10px;background:white;padding:8px;
+            border-radius:8px;text-decoration:none;color:black;
         }
 
-        /* INFO BOX */
         .info-box{
-            position:absolute;
-            bottom:20px;
-            left:20px;
-            background:white;
-            padding:12px;
-            border-radius:10px;
-            box-shadow:0 3px 10px rgba(0,0,0,0.2);
-            z-index:1000;
-            font-size:14px;
+            position:absolute;bottom:20px;left:20px;
+            background:white;padding:12px;border-radius:10px;
         }
     </style>
 </head>
@@ -115,11 +62,9 @@
 
 <div id="map"></div>
 
-<!-- SEARCH BOX -->
 <div class="search-box">
     <input id="start" placeholder="Start location">
     <input id="end" placeholder="Destination">
-
     <button onclick="startNav()">🚀 Start</button>
 
     <select id="lang">
@@ -127,102 +72,169 @@
         <option>Hindi</option>
         <option>Telugu</option>
     </select>
-
-    <div id="info"></div>
 </div>
 
-<!-- TOP MENU -->
 <div class="top-menu">
     <a href="/dashboard">📊 Dashboard</a>
     <a href="/logout">🚪 Logout</a>
 </div>
 
-<!-- FLOATING BUTTONS -->
 <div class="floating">
     <button onclick="findPlace('fuel')">⛽</button>
     <button onclick="findPlace('hotel')">🏨</button>
     <button onclick="findPlace('atm')">🏧</button>
 </div>
 
-<!-- INFO BOX -->
 <div class="info-box" id="stats">
-    Distance: -- <br>
-    Time: --
+    Distance: -- <br> Time: --
 </div>
 
 <script>
-let map = L.map('map').setView([17.3850,78.4867], 13);
+const API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUyNjVjNzM5YjIyYjQyN2RhMjY2OGQ5NmNhNzQ1ODBiIiwiaCI6Im11cm11cjY0In0="; // 🔥 ADD YOUR KEY HERE
 
+let map = L.map('map').setView([17.3850,78.4867], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let userMarker;
+let userMarker, routeLine;
+let routeCoords = [];
+let navigationActive = false;
+let rerouting = false;
+
+/* GPS TRACK */
 navigator.geolocation.watchPosition(pos=>{
     let lat = pos.coords.latitude;
     let lon = pos.coords.longitude;
 
     if(!userMarker){
-        userMarker = L.marker([lat,lon]).addTo(map).bindPopup("You are here").openPopup();
+        userMarker = L.marker([lat,lon]).addTo(map);
     }else{
         userMarker.setLatLng([lat,lon]);
     }
 
     map.setView([lat,lon],13);
-});
 
-let routeLine;
+    if(navigationActive){
+        checkDeviation([lat,lon]);
+    }
 
+},{enableHighAccuracy:true});
+
+/* START NAVIGATION */
 async function startNav(){
-    let res = await fetch('/get_route_type');
-    let data = await res.json();
 
-    let routeType = data.type;
-    
+    let res = await fetch('/get_route_type');
+    let routeType = (await res.json()).type;
+
     let start = document.getElementById("start").value;
     let end = document.getElementById("end").value;
 
-    let s = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${start}`);
-    let e = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${end}`);
+    let geoStart = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}`);
+    let geoEnd = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
 
-    let sdata = await s.json();
-    let edata = await e.json();
+    let sdata = await geoStart.json();
+    let edata = await geoEnd.json();
 
-    let sLat = sdata[0].lat;
-    let sLon = sdata[0].lon;
-    let eLat = edata[0].lat;
-    let eLon = edata[0].lon;
+    let sCoord = sdata.features[0].geometry.coordinates;
+    let eCoord = edata.features[0].geometry.coordinates;
+
+    let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
+        method:"POST",
+        headers:{
+            "Authorization":API_KEY,
+            "Content-Type":"application/json"
+        },
+        body: JSON.stringify({coordinates:[sCoord,eCoord]})
+    });
+
+    let routeData = await routeRes.json();
 
     if(routeLine) map.removeLayer(routeLine);
 
-    if(routeType === "safe"){
-    routeLine = L.polyline([[sLat,sLon],[eLat,eLon]], {color:'green'}).addTo(map);
-    }
-    else if(routeType === "normal"){
-    routeLine = L.polyline([[sLat,sLon],[eLat,eLon]], {color:'blue'}).addTo(map);
-    }
-    else{
-    routeLine = L.polyline([[sLat,sLon],[eLat,eLon]], {color:'red'}).addTo(map);
-    speak("Safer route selected for you");
-    }
+    let color = routeType==="safe"?"green":routeType==="normal"?"blue":"red";
 
-    L.marker([sLat,sLon]).addTo(map).bindPopup("Start");
-    L.marker([eLat,eLon]).addTo(map).bindPopup("Destination");
-
+    routeLine = L.geoJSON(routeData,{style:{color:color,weight:6}}).addTo(map);
     map.fitBounds(routeLine.getBounds());
 
-    let distance = (Math.random()*300).toFixed(2);
-    let time = (distance/40).toFixed(2);
+    routeCoords = routeData.features[0].geometry.coordinates;
+    navigationActive = true;
+
+    let summary = routeData.features[0].properties.summary;
+    let distance = (summary.distance/1000).toFixed(2);
+    let time = (summary.duration/3600).toFixed(2);
 
     document.getElementById("stats").innerHTML =
         "Distance: "+distance+" KM <br> Time: "+time+" hr";
 
     speak("Navigation started");
-
     saveBehavior();
 }
 
+/* OFF ROUTE DETECTION */
+function checkDeviation(userPos){
+
+    let minDist = Infinity;
+
+    routeCoords.forEach(coord=>{
+        let p = [coord[1], coord[0]];
+        let d = map.distance(userPos, p);
+        if(d < minDist) minDist = d;
+    });
+
+    if(minDist > 100 && !rerouting){
+        rerouting = true;
+
+        speak("Warning! You are off route");
+        alert("⚠️ You are off route! Rerouting...");
+
+        reroute(userPos);
+    }
+}
+
+/* REROUTE */
+async function reroute(userPos){
+
+    let end = document.getElementById("end").value;
+
+    let geoEnd = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
+    let edata = await geoEnd.json();
+
+    let endCoord = edata.features[0].geometry.coordinates;
+
+    let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
+        method:"POST",
+        headers:{
+            "Authorization":API_KEY,
+            "Content-Type":"application/json"
+        },
+        body: JSON.stringify({
+            coordinates: [[userPos[1],userPos[0]], endCoord]
+        })
+    });
+
+    let routeData = await routeRes.json();
+
+    routeCoords = routeData.features[0].geometry.coordinates;
+
+    if(routeLine) map.removeLayer(routeLine);
+
+    routeLine = L.geoJSON(routeData,{style:{color:"red",weight:6}}).addTo(map);
+
+    map.fitBounds(routeLine.getBounds());
+
+    let summary = routeData.features[0].properties.summary;
+
+    document.getElementById("stats").innerHTML =
+        "Distance: "+(summary.distance/1000).toFixed(2)+" KM <br> Time: "+
+        (summary.duration/3600).toFixed(2)+" hr";
+
+    speak("New route calculated");
+
+    rerouting = false;
+}
+
+/* SPEECH */
 function speak(text){
     let lang = document.getElementById("lang").value;
-
     let msg = new SpeechSynthesisUtterance(text);
 
     if(lang=="Hindi") msg.lang="hi-IN";
@@ -232,28 +244,23 @@ function speak(text){
     speechSynthesis.speak(msg);
 }
 
+/* EXTRA */
 function findPlace(type){
     alert("Showing nearby "+type);
 }
 
 function saveBehavior(){
-
-    navigator.geolocation.getCurrentPosition(pos => {
-
+    navigator.geolocation.getCurrentPosition(pos=>{
         fetch('/save_behavior',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
             body:JSON.stringify({
-                deviations: Math.floor(Math.random()*3),
-                stops: Math.floor(Math.random()*2),
-                confusion: Math.floor(Math.random()*2),
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude
+                deviations:1,stops:1,
+                lat:pos.coords.latitude,
+                lon:pos.coords.longitude
             })
         });
-
     });
-
 }
 </script>
 
