@@ -159,8 +159,8 @@ async function startNav(){
 
     try{
 
-        let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start + ", India")}`);
-        let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end + ", India")}`);
+        let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}`);
+        let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
 
         let sdata = await s.json();
         let edata = await e.json();
