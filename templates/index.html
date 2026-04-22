@@ -89,7 +89,7 @@ const API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUyNjVjNzM
 let map = L.map('map').setView([17.3850,78.4867], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let userMarker;
+let userMarker = null;
 let routeLine;
 let routeCoords = [];
 let rerouting = false;
@@ -98,6 +98,7 @@ let lastLat = null;
 let lastLon = null;
 let warningGiven = false;
 let lastUpdate = 0;
+
 
 function getDistance(lat1, lon1, lat2, lon2) {
     let R = 6371;
@@ -115,35 +116,89 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 /* 📍 GPS */
-navigator.geolocation.watchPosition(function(position) {
+    navigator.geolocation.watchPosition(
+function(position) {
 
     const lat = position.coords.latitude;
     const lon = position.coords.longitude;
 
-    // first position → do nothing
+    // -------------------------------
+    // 📍 CREATE / UPDATE USER MARKER
+    // -------------------------------
+    if (!userMarker) {
+        userMarker = L.marker([lat, lon]).addTo(map)
+            .bindPopup("📍 You are here")
+            .openPopup();
+
+        map.setView([lat, lon], 15);
+    } else {
+        // Smooth movement
+        userMarker.slideTo([lat, lon], {
+    duration: 1000,
+    keepAtCenter: true
+        });
+    }
+
+    // -------------------------------
+    // 🧠 FIRST POSITION (DO NOTHING)
+    // -------------------------------
     if (lastLat === null) {
         lastLat = lat;
         lastLon = lon;
         return;
     }
 
+    // -------------------------------
+    // 📏 DISTANCE CALCULATION
+    // -------------------------------
     let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
 
-    // start navigation ONLY after movement
+    // -------------------------------
+    // 🚀 START NAVIGATION AFTER MOVEMENT
+    // -------------------------------
     if (!started && distanceMoved > 0.02) {
         started = true;
         speak("Navigation started");
         console.log("Navigation started");
     }
 
+    // If still not started → stop here
     if (!started) return;
 
-    // your existing route logic
+    // -------------------------------
+    // 🗺️ ROUTE CHECKING
+    // -------------------------------
     checkRoute(lat, lon);
 
+    // -------------------------------
+    // 🧠 SAVE USER BEHAVIOR (AI)
+    // -------------------------------
+    if (typeof saveBehavior === "function") {
+        saveBehavior(lat, lon);
+    }
+
+    // -------------------------------
+    // 🔄 UPDATE LAST POSITION
+    // -------------------------------
     lastLat = lat;
     lastLon = lon;
 
+},
+function(error) {
+    console.log("GPS Error:", error);
+
+    if (error.code === 1) {
+        alert("Please allow location access!");
+    } else if (error.code === 2) {
+        alert("Location unavailable!");
+    } else if (error.code === 3) {
+        alert("Location request timed out!");
+    }
+},
+{
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 5000
 });
 
 /* 🚀 START NAV */
