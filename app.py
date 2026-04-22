@@ -90,6 +90,26 @@ def home():
     return render_template('index.html')
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        user = conn.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password)
+        ).fetchone()
+        conn.close()
+
+        if user:
+            return redirect(f"/user/{username}")
+        else:
+            return "Invalid credentials"
+
+    return render_template('login.html')
+
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
