@@ -266,24 +266,34 @@ async function startNav(){
 let distance = 0;
 let time = 0;
 
-// ✅ Try summary first
-if (feature.properties.summary) {
-    distance = feature.properties.summary.distance;
-    time = feature.properties.summary.duration;
-}
-// ✅ Fallback to segments (IMPORTANT FIX)
-else if (feature.properties.segments && feature.properties.segments.length > 0) {
-    distance = feature.properties.segments[0].distance;
-    time = feature.properties.segments[0].duration;
+// ✅ ALWAYS WORKING METHOD
+if (feature.properties) {
+
+    // Try summary
+    if (feature.properties.summary) {
+        distance = feature.properties.summary.distance || 0;
+        time = feature.properties.summary.duration || 0;
+    }
+
+    // If still zero → calculate manually from segments
+    if ((distance === 0 || time === 0) && feature.properties.segments) {
+        feature.properties.segments.forEach(seg => {
+            distance += seg.distance || 0;
+            time += seg.duration || 0;
+        });
+    }
 }
 
-if (distance && time) {
-    document.getElementById("stats").innerHTML =
-        `Distance: ${(distance/1000).toFixed(2)} KM <br> Time: ${(time/60).toFixed(0)} min`;
-} else {
-    document.getElementById("stats").innerHTML =
-        "Distance: -- <br> Time: --";
-}
+// 🔍 DEBUG LINE (ADD HERE)
+console.log("DIST:", distance, "TIME:", time);
+
+// ✅ FINAL DISPLAY (NO FAIL)
+distance = (distance / 1000).toFixed(2);
+time = (time / 60).toFixed(0);
+
+document.getElementById("stats").innerHTML =
+    `Distance: ${distance} KM <br> Time: ${time} min`;
+    
     }catch(err){
         console.log(err);
         alert("Route error. Check API key.");
