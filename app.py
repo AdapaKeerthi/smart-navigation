@@ -84,23 +84,26 @@ def map_page():
 
 
 # ================= LOGIN =================
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
+
     if request.method == 'POST':
-        u = request.form['username']
-        p = request.form['password']
+        username = request.form['username']
+        password = request.form['password']
 
         conn = get_db()
-cur = conn.cursor()
+        cur = conn.cursor()
 
-cur.execute("SELECT id,password FROM users WHERE username=%s", (username,))
-user = cur.fetchone()
+        cur.execute("SELECT id FROM users WHERE username=%s AND password=%s", (username, password))
+        user = cur.fetchone()
 
-if user and bcrypt.checkpw(password.encode(), user[1].encode()):
-    session['user_id'] = user[0]
-    return redirect('/map')
+        conn.close()
 
-return "Invalid credentials"
+        if user:
+            session['user_id'] = user[0]
+            return redirect('/map')
+
+    return render_template('login.html')
 
 
 # ================= REGISTER =================
