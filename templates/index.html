@@ -164,7 +164,7 @@ function(position) {
     }
 
     if (navigationStarted) {
-    map.setView([lat, lon], 17);
+    map.setView([lat, lon], 13);
 }
 
     // ✅ FIRST TIME SKIP
@@ -269,7 +269,10 @@ async function startNav(){
             style:{color:"blue",weight:6}
         }).addTo(map);
 
-        map.fitBounds(routeLine.getBounds());
+        map.fitBounds(routeLine.getBounds(), {
+    padding: [50, 50],   // adds space around route
+    maxZoom: 13          // 🚀 prevents too much zoom
+});
         navigationStarted = true;
         routeCoords = routeData.features[0].geometry.coordinates;
 
@@ -379,7 +382,10 @@ async function reroute(lat,lon){
         style:{color:"red",weight:6}
     }).addTo(map);
 
-    map.fitBounds(routeLine.getBounds());
+    map.fitBounds(routeLine.getBounds(), {
+    padding: [50, 50],   // adds space around route
+    maxZoom: 13          // 🚀 prevents too much zoom
+});
     navigationStarted = true;
     speak("Rerouting...");
     rerouting = false;

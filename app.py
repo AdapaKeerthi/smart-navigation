@@ -23,7 +23,7 @@ def get_db():
     try:
         return psycopg2.connect(DATABASE_URL, sslmode='require')
     except Exception as e:
-        print("❌ DB ERROR:", e)
+        print("❌ DB CONNECTION ERROR:", e)
         return None
 
 
@@ -113,62 +113,80 @@ def register():
         p = request.form['password']
 
         conn = get_db()
-        cur = conn.cursor()
+        if not conn:
+            return "DB error"
 
         try:
-            cur.execute("INSERT INTO users(username,password) VALUES(%s,%s)",(u,p))
-            conn.commit()
-        except:
-            return "User already exists"
+            c = conn.cursor()
 
-        conn.close()
-        return redirect('/login')
+            c.execute("SELECT id FROM users WHERE username=%s", (u,))
+            if c.fetchone():
+                return "Username already exists"
+
+            c.execute(
+                "INSERT INTO users(username,password) VALUES(%s,%s)",
+                (u,p)
+            )
+
+            conn.commit()
+            conn.close()
+
+            return redirect('/login')
+
+        except Exception as e:
+            print("REGISTER ERROR:", e)
+            return "Registration failed"
 
     return render_template('register.html')
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect('/login')
 
 
 # ================= SAVE BEHAVIOR (FIXED) =================
 @app.route('/save_behavior', methods=['POST'])
 def save_behavior():
-
     if 'user_id' not in session:
-        return jsonify({"error":"login required"})
+        return jsonify({"error": "login required"})
 
-    data = request.json
+    try:
+        data = request.json
 
-    deviations = data.get('deviations', 0)
-    stops = data.get('stops', 0)
-    confusion = data.get('confusion', 0)
-    lat = data.get('lat', 17.38)
-    lon = data.get('lon', 78.48)
+        d = data.get('deviations', 0)
+        s = data.get('stops', 0)
+        c = data.get('confusion', 0)
+        lat = data.get('lat', 0)
+        lon = data.get('lon', 0)
 
-    # 🔥 SCORE LOGIC
-    score = max(0, 100 - (deviations*5 + stops*3 + confusion*4))
+        score = max(0, 100 - (d*5 + s*3 + c*4))
 
-    driver_type = model.predict([[deviations, stops, confusion]])[0]
+        # ✅ SAFE MODEL CALL
+        try:
+            prediction = model.predict([[d, s, c]])
+            driver_type = prediction[0]
+        except Exception as e:
+            print("MODEL ERROR:", e)
+            driver_type = "unknown"
 
-    conn = get_db()
-    cur = conn.cursor()
+        conn = get_db()
+        if not conn:
+            return jsonify({"error": "DB error"})
 
-    cur.execute("""
-    INSERT INTO driving_data(
-        user_id, deviations, stops, confusion,
-        score, driver_type, latitude, longitude
-    )
-    VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-    """,(session['user_id'], deviations, stops, confusion,
-         score, driver_type, lat, lon))
+        cur = conn.cursor()
 
-    conn.commit()
-    conn.close()
+        cur.execute("""
+        INSERT INTO driving_data(
+            user_id,deviations,stops,confusion,
+            score,driver_type,latitude,longitude
+        )
+        VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (session['user_id'], d, s, c, score, driver_type, lat, lon))
 
-    return jsonify({"score":score})
+        conn.commit()
+        conn.close()
+
+        return jsonify({"score": score, "driver_type": driver_type})
+
+    except Exception as e:
+        print("SAVE ERROR:", e)
+        return jsonify({"error": "save failed"})
 
 
 # ================= LIVE TRACKING (FIXED) =================
