@@ -70,18 +70,38 @@
         .warning{background:#ffeaa7;}
         .safe{background:#55efc4;}
 
-        /* SIDE PANEL */
-        .side{
-            position:absolute;
-            right:20px;
-            top:80px;
-            background:white;
-            padding:15px;
-            border-radius:12px;
-            width:260px;
-            z-index:1000;
-            box-shadow:0 4px 15px rgba(0,0,0,0.2);
-        }
+        
+        /* ✅ RIGHT SIDE - USERS */
+.registered-users {
+    position: absolute;
+    top: 80px;
+    right: 20px;
+    width: 260px;
+    max-height: 70vh;
+    overflow-y: auto;
+
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+/* ✅ RIGHT SIDE - ANALYTICS */
+.analytics-panel {
+    position: absolute;
+    top: 80px;
+    right: 300px;  /* 👈 IMPORTANT: moves left */
+    width: 260px;
+
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
 
         .stat{
             margin-bottom:10px;
@@ -104,6 +124,48 @@
             50%{opacity:0.3;}
             100%{opacity:1;}
         }
+
+        /* ✅ RIGHT SIDE PANEL FIX */
+.registered-users {
+    position: absolute;
+    top: 80px;
+    right: 20px;
+    width: 260px;
+    max-height: 75vh;
+    overflow-y: auto;
+
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+/* ✅ PREVENT OVERFLOW */
+body {
+    overflow-x: hidden;
+}
+
+/* ✅ HEADER FIX */
+.admin-header {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* ✅ ALERT BOX FIX */
+.live-alerts {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+}
+
+
+
     </style>
 </head>
 
@@ -124,7 +186,7 @@
     <div id="time">Time: -- hr</div>
 </div>
 
-<div class="side" style="top:20px; right:20px;">
+<div class="registered-users">
     <h4>👤 Registered Users</h4>
 
     {% for user in users %}
@@ -147,7 +209,7 @@
 </div>
 
 <!-- SIDE ANALYTICS -->
-<div class="side">
+<div class="analytics-panel"></div>
     <div class="stat">🟢 Safe Users: <b id="safe">0</b></div>
     <div class="stat">🟡 Medium Risk: <b id="medium">0</b></div>
     <div class="stat">🔴 Danger Users: <b id="danger">0</b></div>

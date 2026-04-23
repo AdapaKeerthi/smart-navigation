@@ -23,69 +23,57 @@ def get_db():
     try:
         return psycopg2.connect(DATABASE_URL, sslmode='require')
     except Exception as e:
-        print("❌ DB CONNECTION ERROR:", e)
+        print("❌ DB ERROR:", e)
         return None
 
 
 def init_db():
     conn = get_db()
-
     if not conn:
-        print("❌ Skipping DB init")
         return
 
-    try:
-        c = conn.cursor()
+    c = conn.cursor()
 
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS users(
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password TEXT
-        )
-        """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT
+    )
+    """)
 
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS driving_data(
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER,
-            deviations INTEGER,
-            stops INTEGER,
-            confusion INTEGER,
-            score INTEGER,
-            driver_type TEXT,
-            latitude DOUBLE PRECISION,
-            longitude DOUBLE PRECISION,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS driving_data(
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        deviations INTEGER,
+        stops INTEGER,
+        confusion INTEGER,
+        score INTEGER,
+        driver_type TEXT,
+        latitude DOUBLE PRECISION,
+        longitude DOUBLE PRECISION,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
 
-        c.execute("""
-        INSERT INTO users (id, username, password)
-        VALUES (999,'admin','admin123')
-        ON CONFLICT (id) DO NOTHING
-        """)
+    # admin user
+    c.execute("""
+    INSERT INTO users (id, username, password)
+    VALUES (999,'admin','admin123')
+    ON CONFLICT (id) DO NOTHING
+    """)
 
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
-        print("✅ DB initialized")
-
-    except Exception as e:
-        print("❌ INIT DB ERROR:", e)
-
-
-# ⚠️ IMPORTANT: DO NOT crash app if DB fails
-try:
-    init_db()
-except:
-    print("⚠️ DB skipped during startup")
-
+init_db()
 
 # ================= ROUTES =================
 @app.route('/')
 def home():
-    return redirect('/register')
+    return redirect('/login')
+
 
 @app.route('/map')
 def map_page():
@@ -93,68 +81,50 @@ def map_page():
         return redirect('/login')
     return render_template('index.html')
 
+
+# ================= LOGIN =================
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
+        u = request.form['username']
+        p = request.form['password']
 
-        conn = get_db()   # ✅ FIXED
-        if not conn:
-            return "DB error"
-
+        conn = get_db()
         cur = conn.cursor()
 
-        cur.execute(
-            "SELECT id FROM users WHERE username=%s AND password=%s",  # ✅ FIXED
-            (username, password)
-        )
-
+        cur.execute("SELECT id FROM users WHERE username=%s AND password=%s",(u,p))
         user = cur.fetchone()
         conn.close()
 
         if user:
-            session['user_id'] = user[0]   # ✅ FIXED (session set)
+            session['user_id'] = user[0]
             return redirect('/map')
-        else:
-            return "Invalid credentials"
+
+        return "Invalid credentials"
 
     return render_template('login.html')
 
 
+# ================= REGISTER =================
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
         u = request.form['username']
         p = request.form['password']
 
+        conn = get_db()
+        cur = conn.cursor()
+
         try:
-            conn = get_db()
-            if not conn:
-                return "DB connection failed"
-
-            c = conn.cursor()
-
-            c.execute(
-                "INSERT INTO users(username,password) VALUES(%s,%s)",
-                (u,p)
-            )
-
+            cur.execute("INSERT INTO users(username,password) VALUES(%s,%s)",(u,p))
             conn.commit()
-            conn.close()
+        except:
+            return "User already exists"
 
-            return redirect('/login')
-
-        except Exception as e:
-            print("REGISTER ERROR:", e)
-            return "Registration failed"
+        conn.close()
+        return redirect('/login')
 
     return render_template('register.html')
-
-@app.route('/reset')
-def reset():
-    session.clear()
-    return "Session cleared"
 
 
 @app.route('/logout')
@@ -163,41 +133,76 @@ def logout():
     return redirect('/login')
 
 
-
-# ================= SAVE =================
+# ================= SAVE BEHAVIOR (FIXED) =================
 @app.route('/save_behavior', methods=['POST'])
 def save_behavior():
+
     if 'user_id' not in session:
         return jsonify({"error":"login required"})
 
     data = request.json
 
-    d = data.get('deviations', 0)
-    s = data.get('stops', 0)
-    c = data.get('confusion', 0)
-    lat = data.get('lat', 0)
-    lon = data.get('lon', 0)
+    deviations = data.get('deviations', 0)
+    stops = data.get('stops', 0)
+    confusion = data.get('confusion', 0)
+    lat = data.get('lat', 17.38)
+    lon = data.get('lon', 78.48)
 
-    score = max(0, 100 - (d*5 + s*3 + c*4))
+    # 🔥 SCORE LOGIC
+    score = max(0, 100 - (deviations*5 + stops*3 + confusion*4))
 
-    prediction = model.predict([[d,s,c]])
-    driver_type = prediction[0]
+    driver_type = model.predict([[deviations, stops, confusion]])[0]
 
     conn = get_db()
-    if not conn:
-        return jsonify({"error":"DB error"})   # ✅ FIXED
-
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT INTO driving_data(user_id,deviations,stops,confusion,score,driver_type,latitude,longitude)
+    INSERT INTO driving_data(
+        user_id, deviations, stops, confusion,
+        score, driver_type, latitude, longitude
+    )
     VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-    """,(session['user_id'],d,s,c,score,driver_type,lat,lon))
+    """,(session['user_id'], deviations, stops, confusion,
+         score, driver_type, lat, lon))
 
     conn.commit()
     conn.close()
 
-    return jsonify({"score":score,"driver_type":driver_type})
+    return jsonify({"score":score})
+
+
+# ================= LIVE TRACKING (FIXED) =================
+@app.route('/live_data')
+def live_data():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT users.username,
+           driving_data.score,
+           driving_data.latitude,
+           driving_data.longitude
+    FROM driving_data
+    JOIN users ON users.id = driving_data.user_id
+    WHERE driving_data.timestamp > NOW() - INTERVAL '2 minutes'
+    ORDER BY driving_data.timestamp DESC
+    """)
+
+    rows = cur.fetchall()
+    conn.close()
+
+    data = []
+
+    for r in rows:
+        data.append({
+            "username": r[0],
+            "score": r[1],
+            "lat": r[2],
+            "lon": r[3]
+        })
+
+    return jsonify(data)
 
 
 # ================= DASHBOARD =================
@@ -222,68 +227,6 @@ def dashboard():
     return render_template('dashboard.html', data=data)
 
 
-# ================= LIVE DATA =================
-@app.route('/live_data')
-def live_data():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT DISTINCT ON (users.username)
-        users.username,
-        driving_data.score,
-        driving_data.latitude,
-        driving_data.longitude
-    FROM driving_data
-    JOIN users ON users.id = driving_data.user_id
-    ORDER BY users.username, driving_data.timestamp DESC
-    """)
-
-    rows = cur.fetchall()
-    conn.close()
-
-    data = []
-
-    for r in rows:
-        data.append({
-            "username": r[0],
-            "score": r[1],
-            "lat": r[2] if r[2] else 17.38,
-            "lon": r[3] if r[3] else 78.48
-        })
-
-    return jsonify(data)
-
-
-# ================= ROUTE TYPE =================
-@app.route('/get_route_type')
-def get_route_type():
-
-    if 'user_id' not in session:
-        return jsonify({"type":"normal"})
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT AVG(score) FROM driving_data
-    WHERE user_id=%s
-    """, (session['user_id'],))
-
-    avg_score = cur.fetchone()[0]
-    conn.close()
-
-    if avg_score is None:
-        return jsonify({"type":"normal"})
-
-    if avg_score > 80:
-        return jsonify({"type":"safe"})
-    elif avg_score > 50:
-        return jsonify({"type":"normal"})
-    else:
-        return jsonify({"type":"risky"})
-
-
 # ================= ADMIN =================
 @app.route('/admin')
 def admin():
@@ -293,48 +236,33 @@ def admin():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT id,username FROM users")
+    cur.execute("SELECT id, username FROM users")
     users = cur.fetchall()
 
-    cur.execute("""
-    SELECT users.username,driving_data.deviations,driving_data.stops,
-           driving_data.confusion,driving_data.score,driving_data.driver_type,
-           driving_data.timestamp
-    FROM driving_data
-    JOIN users ON users.id = driving_data.user_id
-    ORDER BY driving_data.timestamp DESC
-    """)
-
-    data = cur.fetchall()
     conn.close()
 
-    return render_template('admin.html', users=users, data=data)
+    return render_template('admin.html', users=users)
 
 
 # ================= USER DETAIL =================
 @app.route('/user/<username>')
 def user_detail(username):
 
-    if 'user_id' not in session or session['user_id'] != 999:
-        return "Access Denied"
-
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT id FROM users WHERE username=%s", (username,))
+    cur.execute("SELECT id FROM users WHERE username=%s",(username,))
     user = cur.fetchone()
 
     if not user:
         return "User not found"
-
-    user_id = user[0]
 
     cur.execute("""
     SELECT deviations, stops, confusion, score, driver_type, timestamp
     FROM driving_data
     WHERE user_id=%s
     ORDER BY timestamp DESC
-    """, (user_id,))
+    """,(user[0],))
 
     data = cur.fetchall()
     conn.close()
