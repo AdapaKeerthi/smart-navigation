@@ -123,6 +123,27 @@ function getDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+/* Off Route */
+function isOffRoute(lat, lon) {
+
+    if (!routeCoords || routeCoords.length === 0) return false;
+
+    let minDistance = Infinity;
+
+    routeCoords.forEach(coord => {
+        let routeLat = coord[1];
+        let routeLon = coord[0];
+
+        let dist = getDistance(lat, lon, routeLat, routeLon);
+
+        if (dist < minDistance) {
+            minDistance = dist;
+        }
+    });
+
+    // 🚨 if user is more than 100 meters away → off route
+    return minDistance > 0.1;
+}
 /* 📍 GPS */
 navigator.geolocation.watchPosition(
 function(position) {
@@ -142,8 +163,8 @@ function(position) {
         }).addTo(map).bindPopup("You are here").openPopup();
     }
 
-    if (!navigationStarted) {
-    map.setView([lat, lon], 15);
+    if (navigationStarted) {
+    map.setView([lat, lon], 17);
 }
 
     // ✅ FIRST TIME SKIP
@@ -163,6 +184,7 @@ function(position) {
     if (!started) return;
 
     checkRoute(lat, lon);
+    saveBehavior(lat, lon);
 
     lastLat = lat;
     lastLon = lon;
@@ -306,11 +328,15 @@ document.getElementById("routeInfo").innerHTML =
 /* 🚨 WRONG ROUTE */
 function checkRoute(lat, lon) {
 
-    let offRoute = isOffRoute(lat, lon); // your logic
+    let offRoute = isOffRoute(lat, lon);
 
     if (offRoute && !warningGiven) {
-        speak("You are going in wrong route");
-        alert("⚠️ You are off route!");
+        speak("You are on wrong route");
+        alert("⚠️ Wrong Route!");
+        rerouting = true;
+
+        reroute(lat, lon); // auto fix route
+
         warningGiven = true;
     }
 
