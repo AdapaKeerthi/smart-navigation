@@ -116,90 +116,84 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 /* 📍 GPS */
-    navigator.geolocation.watchPosition(
-function(position) {
+navigator.geolocation.watchPosition(
 
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
+    function(position) {
 
-    // -------------------------------
-    // 📍 CREATE / UPDATE USER MARKER
-    // -------------------------------
-    if (!userMarker) {
-        userMarker = L.marker([lat, lon]).addTo(map)
-            .bindPopup("📍 You are here")
-            .openPopup();
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        // 📍 CREATE / UPDATE USER MARKER
+        if (userMarker) {
+            userMarker.setLatLng([lat, lon]);
+
+            // Smooth movement (optional)
+            if (userMarker.slideTo) {
+                userMarker.slideTo([lat, lon], {
+                    duration: 1000,
+                    keepAtCenter: true
+                });
+            }
+
+        } else {
+            userMarker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+                    iconSize: [30, 30]
+                })
+            }).addTo(map).bindPopup("You are here").openPopup();
+        }
 
         map.setView([lat, lon], 15);
-    } else {
-        // Smooth movement
-        userMarker.slideTo([lat, lon], {
-    duration: 1000,
-    keepAtCenter: true
-        });
-    }
 
-    // -------------------------------
-    // 🧠 FIRST POSITION (DO NOTHING)
-    // -------------------------------
-    if (lastLat === null) {
+        // 🧠 FIRST POSITION
+        if (lastLat === null) {
+            lastLat = lat;
+            lastLon = lon;
+            return;
+        }
+
+        // 📏 DISTANCE
+        let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
+
+        // 🚀 START NAV
+        if (!started && distanceMoved > 0.02) {
+            started = true;
+            speak("Navigation started");
+        }
+
+        if (!started) return;
+
+        // 🗺️ ROUTE CHECK
+        checkRoute(lat, lon);
+
+        // 🧠 SAVE DATA
+        if (typeof saveBehavior === "function") {
+            saveBehavior(lat, lon);
+        }
+
         lastLat = lat;
         lastLon = lon;
-        return;
+    },
+
+    function(error) {
+        console.log("GPS Error:", error);
+
+        if (error.code === 1) {
+            alert("Please allow location access!");
+        } else if (error.code === 2) {
+            alert("Location unavailable!");
+        } else if (error.code === 3) {
+            alert("Location request timed out!");
+        }
+    },
+
+    {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000
     }
-
-    // -------------------------------
-    // 📏 DISTANCE CALCULATION
-    // -------------------------------
-    let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
-
-    // -------------------------------
-    // 🚀 START NAVIGATION AFTER MOVEMENT
-    // -------------------------------
-    if (!started && distanceMoved > 0.02) {
-        started = true;
-        speak("Navigation started");
-        console.log("Navigation started");
-    }
-
-    // If still not started → stop here
-    if (!started) return;
-
-    // -------------------------------
-    // 🗺️ ROUTE CHECKING
-    // -------------------------------
-    checkRoute(lat, lon);
-
-    // -------------------------------
-    // 🧠 SAVE USER BEHAVIOR (AI)
-    // -------------------------------
-    if (typeof saveBehavior === "function") {
-        saveBehavior(lat, lon);
-    }
-
-    // -------------------------------
-    // 🔄 UPDATE LAST POSITION
-    // -------------------------------
-    lastLat = lat;
-    lastLon = lon;
-
-},
-function(error) {
-    console.log("GPS Error:", error);
-
-    if (error.code === 1) {
-        alert("Please allow location access!");
-    } else if (error.code === 2) {
-        alert("Location unavailable!");
-    } else if (error.code === 3) {
-        alert("Location request timed out!");
-    }
-},
-{
-    enableHighAccuracy: true,
-    maximumAge: 0,
-    timeout: 5000
-});
+);
 
 /* 🚀 START NAV */
 async function startNav(){
@@ -245,6 +239,18 @@ async function startNav(){
         map.fitBounds(routeLine.getBounds());
 
         routeCoords = routeData.features[0].geometry.coordinates;
+            // 🟢 START MARKER
+if(startMarker) map.removeLayer(startMarker);
+startMarker = L.marker([sCoord[1], sCoord[0]])
+    .addTo(map)
+    .bindPopup("Start Location")
+    .openPopup();
+
+// 🔴 END MARKER
+if(endMarker) map.removeLayer(endMarker);
+endMarker = L.marker([eCoord[1], eCoord[0]])
+    .addTo(map)
+    .bindPopup("Destination");
 
         // ✅ REAL DISTANCE
         let summary = routeData.features[0].properties.summary;
