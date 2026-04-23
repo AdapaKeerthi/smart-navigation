@@ -139,6 +139,12 @@ def register():
 
     return render_template('register.html')
 
+# ============= Logout ====================
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
 
 # ================= SAVE BEHAVIOR (FIXED) =================
 @app.route('/save_behavior', methods=['POST'])
