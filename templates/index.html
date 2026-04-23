@@ -98,6 +98,7 @@ let lastLat = null;
 let lastLon = null;
 let warningGiven = false;
 let lastUpdate = 0;
+let navigationStarted = false;
 
 
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -117,83 +118,65 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 /* 📍 GPS */
 navigator.geolocation.watchPosition(
+function(position) {
 
-    function(position) {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
 
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
+    // ✅ Marker
+    if (userMarker) {
+        userMarker.setLatLng([lat, lon]);
+    } else {
+        userMarker = L.marker([lat, lon], {
+            icon: L.icon({
+                iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+                iconSize: [30, 30]
+            })
+        }).addTo(map).bindPopup("You are here").openPopup();
+    }
 
-        // 📍 CREATE / UPDATE USER MARKER
-        if (userMarker) {
-            userMarker.setLatLng([lat, lon]);
+    if (!navigationStarted) {
+    map.setView([lat, lon], 15);
+}
 
-            // Smooth movement (optional)
-            if (userMarker.slideTo) {
-                userMarker.slideTo([lat, lon], {
-                    duration: 1000,
-                    keepAtCenter: true
-                });
-            }
-
-        } else {
-            userMarker = L.marker([lat, lon], {
-                icon: L.icon({
-                    iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
-                    iconSize: [30, 30]
-                })
-            }).addTo(map).bindPopup("You are here").openPopup();
-        }
-
-        map.setView([lat, lon], 15);
-
-        // 🧠 FIRST POSITION
-        if (lastLat === null) {
-            lastLat = lat;
-            lastLon = lon;
-            return;
-        }
-
-        // 📏 DISTANCE
-        let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
-
-        // 🚀 START NAV
-        if (!started && distanceMoved > 0.02) {
-            started = true;
-            speak("Navigation started");
-        }
-
-        if (!started) return;
-
-        // 🗺️ ROUTE CHECK
-        checkRoute(lat, lon);
-
-        // 🧠 SAVE DATA
-        if (typeof saveBehavior === "function") {
-            saveBehavior(lat, lon);
-        }
-
+    // ✅ FIRST TIME SKIP
+    if (lastLat === null) {
         lastLat = lat;
         lastLon = lon;
-    },
-
-    function(error) {
-        console.log("GPS Error:", error);
-
-        if (error.code === 1) {
-            alert("Please allow location access!");
-        } else if (error.code === 2) {
-            alert("Location unavailable!");
-        } else if (error.code === 3) {
-            alert("Location request timed out!");
-        }
-    },
-
-    {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000
+        return;
     }
-);
+
+    let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
+
+    if (!started && distanceMoved > 0.02) {
+        started = true;
+        speak("Navigation started");
+    }
+
+    if (!started) return;
+
+    checkRoute(lat, lon);
+
+    lastLat = lat;
+    lastLon = lon;
+
+},
+function(error) {
+
+    console.log("GPS Error:", error);
+
+    if (error.code === 1) {
+        alert("Please allow location access!");
+    } else if (error.code === 2) {
+        alert("Location unavailable!");
+    } 
+
+},
+{
+    enableHighAccuracy: true,
+    maximumAge: 10000,
+    timeout: 20000
+});
 
 /* 🚀 START NAV */
 async function startNav(){
@@ -208,15 +191,22 @@ async function startNav(){
 
     try{
 
-        let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}`);
-        let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
+        // 🔍 GEOCODE
+         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=1`);
+        let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=1`);
 
         let sdata = await s.json();
         let edata = await e.json();
 
+        if (!sdata.features.length || !edata.features.length){
+            alert("Location not found");
+            return;
+        }
+
         let sCoord = sdata.features[0].geometry.coordinates;
         let eCoord = edata.features[0].geometry.coordinates;
 
+        // 🚗 ROUTE API
         let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
             method:"POST",
             headers:{
@@ -230,39 +220,66 @@ async function startNav(){
 
         let routeData = await routeRes.json();
 
-        if(routeLine) map.removeLayer(routeLine);
+        // ❌ ERROR CHECK
+        if (!routeData.features){
+            console.log(routeData);
+            alert("Route error. Check API key.");
+            return;
+        }
 
+        // 🗺️ REMOVE OLD ROUTE
+        if (routeLine) {
+            map.removeLayer(routeLine);
+        }
+
+        // 🟦 DRAW ROUTE
         routeLine = L.geoJSON(routeData,{
             style:{color:"blue",weight:6}
         }).addTo(map);
 
         map.fitBounds(routeLine.getBounds());
-
+        navigationStarted = true;
         routeCoords = routeData.features[0].geometry.coordinates;
-            // 🟢 START MARKER
-if(startMarker) map.removeLayer(startMarker);
-startMarker = L.marker([sCoord[1], sCoord[0]])
-    .addTo(map)
-    .bindPopup("Start Location")
-    .openPopup();
 
-// 🔴 END MARKER
-if(endMarker) map.removeLayer(endMarker);
-endMarker = L.marker([eCoord[1], eCoord[0]])
-    .addTo(map)
-    .bindPopup("Destination");
+        // 📍 MARKERS
+        if (window.startMarker) map.removeLayer(window.startMarker);
+        if (window.endMarker) map.removeLayer(window.endMarker);
 
-        // ✅ REAL DISTANCE
-        let summary = routeData.features[0].properties.summary;
-        let distance = (summary.distance/1000).toFixed(2);
-        let time = (summary.duration/3600).toFixed(2);
+        window.startMarker = L.marker([sCoord[1], sCoord[0]])
+            .addTo(map)
+            .bindPopup("Start")
+            .openPopup();
 
-        document.getElementById("stats").innerHTML =
-            "Distance: "+distance+" KM <br> Time: "+time+" hr";
+        window.endMarker = L.marker([eCoord[1], eCoord[0]])
+            .addTo(map)
+            .bindPopup("Destination");
 
-        speak("Navigation started");
+        // 📏 DISTANCE + TIME
+      let feature = routeData.features[0];
 
+let distance = 0;
+let time = 0;
+
+// ✅ Try summary first
+if (feature.properties.summary) {
+    distance = feature.properties.summary.distance;
+    time = feature.properties.summary.duration;
+}
+// ✅ Fallback to segments (IMPORTANT FIX)
+else if (feature.properties.segments && feature.properties.segments.length > 0) {
+    distance = feature.properties.segments[0].distance;
+    time = feature.properties.segments[0].duration;
+}
+
+if (distance && time) {
+    document.getElementById("stats").innerHTML =
+        `Distance: ${(distance/1000).toFixed(2)} KM <br> Time: ${(time/60).toFixed(0)} min`;
+} else {
+    document.getElementById("stats").innerHTML =
+        "Distance: -- <br> Time: --";
+}
     }catch(err){
+        console.log(err);
         alert("Route error. Check API key.");
     }
 }
@@ -308,14 +325,16 @@ async function reroute(lat,lon){
 
     routeCoords = routeData.features[0].geometry.coordinates;
 
-    if(routeLine) map.removeLayer(routeLine);
+    if (routeLine) {
+    map.removeLayer(routeLine);
+}
 
     routeLine = L.geoJSON(routeData,{
         style:{color:"red",weight:6}
     }).addTo(map);
 
     map.fitBounds(routeLine.getBounds());
-
+    navigationStarted = true;
     speak("Rerouting...");
     rerouting = false;
 }
