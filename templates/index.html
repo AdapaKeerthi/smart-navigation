@@ -206,8 +206,11 @@ async function startNav(){
             return;
         }
 
-        let sCoord = sdata.features[0].geometry.coordinates;
-        let eCoord = edata.features[0].geometry.coordinates;
+        let sFeature = sdata.features.find(f => f.properties.country === "India") || sdata.features[0];
+        let eFeature = edata.features.find(f => f.properties.country === "India") || edata.features[0];
+
+        let sCoord = sFeature.geometry.coordinates;
+        let eCoord = eFeature.geometry.coordinates;
 
         // 🚗 ROUTE API
         let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
@@ -308,10 +311,11 @@ async function reroute(lat,lon){
 
     let end = document.getElementById("end").value;
 
-    let geoEnd = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end + ", India")}`);
+    let geoEnd = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
     let edata = await geoEnd.json();
 
-    let endCoord = edata.features[0].geometry.coordinates;
+    let eFeature = edata.features.find(f => f.properties.country === "India") || edata.features[0];
+    let endCoord = eFeature.geometry.coordinates;
 
     let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
         method:"POST",
