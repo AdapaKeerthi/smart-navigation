@@ -166,7 +166,13 @@ async function loadLive(){
 
     let res = await fetch('/live_data');
     let data = await res.json();
+    let summary = data.features[0].properties.summary;
 
+    let distance_km = (summary.distance / 1000).toFixed(2);
+    let duration_min = Math.round(summary.duration / 60);
+
+document.getElementById("routeInfo").innerHTML =
+    "Distance: " + distance_km + " km | Time: " + duration_min + " min";
     let alertBox = document.getElementById("alerts");
     alertBox.innerHTML = "<b>🚨 Live Alerts</b>";
 
