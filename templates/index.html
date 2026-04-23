@@ -10,7 +10,14 @@
 
 <style>
 body{margin:0;font-family:Arial;}
-#map{height:100vh;width:100%;}
+#map{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+z-index:1;
+}
 .search-box{
 position:absolute;top:20px;left:50%;
 transform:translateX(-50%);
@@ -81,9 +88,6 @@ Distance: -- km | Time: -- min
 <button onclick="findPlace('atm')">🏧</button>
 </div>
 
-<div class="info-box" id="stats">
-Distance: -- <br> Time: --
-</div>
 
 <script>
 
@@ -260,8 +264,9 @@ async function startNav(){
             .addTo(map)
             .bindPopup("Destination");
 
-        // 📏 DISTANCE + TIME
-      let feature = routeData.features[0];
+    
+ // 📏 DISTANCE + TIME
+let feature = routeData.features[0];
 
 let distance = 0;
 let time = 0;
@@ -269,13 +274,11 @@ let time = 0;
 // ✅ ALWAYS WORKING METHOD
 if (feature.properties) {
 
-    // Try summary
     if (feature.properties.summary) {
         distance = feature.properties.summary.distance || 0;
         time = feature.properties.summary.duration || 0;
     }
 
-    // If still zero → calculate manually from segments
     if ((distance === 0 || time === 0) && feature.properties.segments) {
         feature.properties.segments.forEach(seg => {
             distance += seg.distance || 0;
@@ -284,21 +287,21 @@ if (feature.properties) {
     }
 }
 
-// 🔍 DEBUG LINE (ADD HERE)
+// DEBUG
 console.log("DIST:", distance, "TIME:", time);
 
-// ✅ FINAL DISPLAY (NO FAIL)
+// FORMAT
 distance = (distance / 1000).toFixed(2);
 time = (time / 60).toFixed(0);
 
-document.getElementById("stats").innerHTML =
-    `Distance: ${distance} KM <br> Time: ${time} min`;
+// ✅ SHOW ONLY IN TOP BOX
+document.getElementById("routeInfo").innerHTML =
+    `Distance: ${distance} KM | Time: ${time} min`;
+
+document.getElementById("routeInfo").innerHTML =
+    `Distance: ${distance} KM | Time: ${time} min`;
     
-    }catch(err){
-        console.log(err);
-        alert("Route error. Check API key.");
-    }
-}
+   }catch(err){ console.log(err); alert("Route error. Check API key."); } }
 
 /* 🚨 WRONG ROUTE */
 function checkRoute(lat, lon) {
