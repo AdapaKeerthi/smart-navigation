@@ -8,7 +8,7 @@ import bcrypt
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "secret123"
+app.secret_key = "super_secret_key_123"
 
 # ================= DB =================
 def get_db():
@@ -84,24 +84,31 @@ def map_page():
 
 
 # ================= LOGIN =================
-@app.route('/login', methods=['GET','POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
         conn = get_db()
+        if not conn:
+            return "DB error"
+
         cur = conn.cursor()
 
-        cur.execute("SELECT id FROM users WHERE username=%s AND password=%s", (username, password))
-        user = cur.fetchone()
+        cur.execute(
+            "SELECT id FROM users WHERE username=%s AND password=%s",
+            (username, password)
+        )
 
+        user = cur.fetchone()
         conn.close()
 
         if user:
-            session['user_id'] = user[0]
-            return redirect('/map')
+            session['user_id'] = user[0]   # ✅ VERY IMPORTANT
+            return redirect('/map')        # ✅ redirect
+
+        return "Invalid credentials"
 
     return render_template('login.html')
 
