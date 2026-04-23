@@ -8,7 +8,14 @@ import bcrypt
 load_dotenv()
 
 app = Flask(__name__)
+
+# 🔥 SESSION FIX (IMPORTANT FOR RENDER)
 app.secret_key = "super_secret_key_123"
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="None"
+)
 
 # ================= DB =================
 def get_db():
@@ -58,13 +65,6 @@ def init_db():
     )
     """)
 
-    # admin user
-    c.execute("""
-    INSERT INTO users (id, username, password)
-    VALUES (999,'admin','admin123')
-    ON CONFLICT (id) DO NOTHING
-    """)
-
     conn.commit()
     conn.close()
 
@@ -96,17 +96,18 @@ def login():
 
         cur = conn.cursor()
 
-        cur.execute(
-            "SELECT id FROM users WHERE username=%s AND password=%s",
-            (username, password)
-        )
-
+        cur.execute("SELECT id, password FROM users WHERE username=%s", (username,))
         user = cur.fetchone()
         conn.close()
 
         if user:
-            session['user_id'] = user[0]   # ✅ VERY IMPORTANT
-            return redirect('/map')        # ✅ redirect
+            stored_password = user[1]
+
+            # 🔥 supports both plain + hashed
+            if stored_password == password or bcrypt.checkpw(password.encode(), stored_password.encode()):
+                session['user_id'] = user[0]
+                session.permanent = True
+                return redirect('/map')
 
         return "Invalid credentials"
 
@@ -131,9 +132,11 @@ def register():
             if c.fetchone():
                 return "Username already exists"
 
+            # 🔥 FIXED HASH
+            hashed = bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
+
             c.execute(
                 "INSERT INTO users(username,password) VALUES(%s,%s)",
-                hashed = bcrypt.hashpw(p.encode(), bcrypt.gensalt())
                 (u, hashed)
             )
 
@@ -148,6 +151,7 @@ def register():
 
     return render_template('register.html')
 
+
 # ============= Logout ====================
 @app.route('/logout')
 def logout():
@@ -155,7 +159,7 @@ def logout():
     return redirect('/login')
 
 
-# ================= SAVE BEHAVIOR (FIXED) =================
+# ================= SAVE BEHAVIOR =================
 @app.route('/save_behavior', methods=['POST'])
 def save_behavior():
     if 'user_id' not in session:
@@ -172,12 +176,10 @@ def save_behavior():
 
         score = max(0, 100 - (d*5 + s*3 + c*4))
 
-        # ✅ SAFE MODEL CALL
         try:
             prediction = model.predict([[d, s, c]])
             driver_type = prediction[0]
-        except Exception as e:
-            print("MODEL ERROR:", e)
+        except:
             driver_type = "unknown"
 
         conn = get_db()
@@ -204,40 +206,6 @@ def save_behavior():
         return jsonify({"error": "save failed"})
 
 
-# ================= LIVE TRACKING (FIXED) =================
-@app.route('/live_data')
-def live_data():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT users.username,
-           driving_data.score,
-           driving_data.latitude,
-           driving_data.longitude
-    FROM driving_data
-    JOIN users ON users.id = driving_data.user_id
-    WHERE driving_data.timestamp > NOW() - INTERVAL '2 minutes'
-    ORDER BY driving_data.timestamp DESC
-    """)
-
-    rows = cur.fetchall()
-    conn.close()
-
-    data = []
-
-    for r in rows:
-        data.append({
-            "username": r[0],
-            "score": r[1],
-            "lat": r[2],
-            "lon": r[3]
-        })
-
-    return jsonify(data)
-
-
 # ================= DASHBOARD =================
 @app.route('/dashboard')
 def dashboard():
@@ -258,49 +226,6 @@ def dashboard():
     conn.close()
 
     return render_template('dashboard.html', data=data)
-
-
-# ================= ADMIN =================
-@app.route('/admin')
-def admin():
-    if 'user_id' not in session or session['user_id'] != 999:
-        return "Access Denied"
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT id, username FROM users")
-    users = cur.fetchall()
-
-    conn.close()
-
-    return render_template('admin.html', users=users)
-
-
-# ================= USER DETAIL =================
-@app.route('/user/<username>')
-def user_detail(username):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT id FROM users WHERE username=%s",(username,))
-    user = cur.fetchone()
-
-    if not user:
-        return "User not found"
-
-    cur.execute("""
-    SELECT deviations, stops, confusion, score, driver_type, timestamp
-    FROM driving_data
-    WHERE user_id=%s
-    ORDER BY timestamp DESC
-    """,(user[0],))
-
-    data = cur.fetchall()
-    conn.close()
-
-    return render_template("user_detail.html", username=username, data=data)
 
 
 # ================= RUN =================
