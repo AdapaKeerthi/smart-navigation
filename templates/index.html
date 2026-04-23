@@ -93,6 +93,15 @@ Distance: -- km | Time: -- min
 
 const API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUyNjVjNzM5YjIyYjQyN2RhMjY2OGQ5NmNhNzQ1ODBiIiwiaCI6Im11cm11cjY0In0=";
 
+window.addEventListener("offline", ()=>{
+    alert("⚠️ No Internet Connection!");
+});
+
+window.addEventListener("online", ()=>{
+    alert("✅ Back Online");
+});
+
+
 let map = L.map('map').setView([17.3850,78.4867], 13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -147,9 +156,21 @@ function isOffRoute(lat, lon) {
 /* 📍 GPS */
 navigator.geolocation.watchPosition(
 function(position) {
+    let lastPositions = [];
 
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
+function smoothLocation(lat, lon){
+    lastPositions.push([lat, lon]);
+    if(lastPositions.length > 5) lastPositions.shift();
+
+    let avgLat = lastPositions.reduce((a,b)=>a+b[0],0)/lastPositions.length;
+    let avgLon = lastPositions.reduce((a,b)=>a+b[1],0)/lastPositions.length;
+
+    return [avgLat, avgLon];
+}
+    let rawLat = position.coords.latitude;
+    let rawLon = position.coords.longitude;
+
+    let [lat, lon] = smoothLocation(rawLat, rawLon);
 
     // ✅ Marker
     if (userMarker) {
@@ -221,8 +242,8 @@ async function startNav(){
     try{
 
         // 🔍 GEOCODE
-         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=1`);
-        let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=1`);
+         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=5`);
+         let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=1`);
 
         let sdata = await s.json();
         let edata = await e.json();
@@ -232,7 +253,9 @@ async function startNav(){
             return;
         }
 
-        let sFeature = sdata.features.find(f => f.properties.country === "India") || sdata.features[0];
+        let sFeature = sdata.features.find(f => 
+    f.properties.label.toLowerCase().includes(start.toLowerCase())
+) || sdata.features[0]; || sdata.features[0];
         let eFeature = edata.features.find(f => f.properties.country === "India") || edata.features[0];
 
         let sCoord = sFeature.geometry.coordinates;
@@ -398,14 +421,17 @@ function saveBehavior(lat,lon){
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-            deviations: Math.floor(Math.random()*2),
-            stops: Math.floor(Math.random()*2),
-            confusion: rerouting ? 1 : 0,
-            lat: lat,
-            lon: lon
+    deviations: Math.floor(Math.random()*3),
+    stops: Math.floor(Math.random()*3),
+    confusion: rerouting ? 1 : 0,
+    speed: Math.random()*80,   // NEW
+    braking: Math.random()*5,  // NEW
+    lat: lat,
+    lon: lon
+})
         })
-    });
-}
+    }
+
 
 /* 🔊 VOICE */
 function speak(text){

@@ -3,6 +3,7 @@ import os
 import psycopg2
 from model import model
 from dotenv import load_dotenv
+import bcrypt
 
 load_dotenv()
 
@@ -90,19 +91,16 @@ def login():
         p = request.form['password']
 
         conn = get_db()
-        cur = conn.cursor()
+cur = conn.cursor()
 
-        cur.execute("SELECT id FROM users WHERE username=%s AND password=%s",(u,p))
-        user = cur.fetchone()
-        conn.close()
+cur.execute("SELECT id,password FROM users WHERE username=%s", (username,))
+user = cur.fetchone()
 
-        if user:
-            session['user_id'] = user[0]
-            return redirect('/map')
+if user and bcrypt.checkpw(password.encode(), user[1].encode()):
+    session['user_id'] = user[0]
+    return redirect('/map')
 
-        return "Invalid credentials"
-
-    return render_template('login.html')
+return "Invalid credentials"
 
 
 # ================= REGISTER =================
@@ -125,7 +123,8 @@ def register():
 
             c.execute(
                 "INSERT INTO users(username,password) VALUES(%s,%s)",
-                (u,p)
+                hashed = bcrypt.hashpw(p.encode(), bcrypt.gensalt())
+                (u, hashed)
             )
 
             conn.commit()

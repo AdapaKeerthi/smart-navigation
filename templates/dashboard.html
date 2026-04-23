@@ -116,6 +116,22 @@
         }
     });
 </script>
+<canvas id="chart"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let scores = {{ data|map(attribute=3)|list|safe }};
+
+new Chart(document.getElementById("chart"), {
+    type: 'line',
+    data: {
+        labels: scores.map((_,i)=>i+1),
+        datasets: [{
+            label: "Driving Score",
+            data: scores
+        }]
+    }
+});
+</script>
 
 </body>
 </html>
