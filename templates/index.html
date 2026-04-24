@@ -154,9 +154,11 @@ function isOffRoute(lat, lon) {
     return minDistance > 0.1;
 }
 /* 📍 GPS */
+
+    let lastPositions = [];
 navigator.geolocation.watchPosition(
 function(position) {
-    let lastPositions = [];
+
 
 function smoothLocation(lat, lon){
     lastPositions.push([lat, lon]);
@@ -242,8 +244,8 @@ async function startNav(){
     try{
 
         // 🔍 GEOCODE
-         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=5`);
-         let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=1`);
+         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=3`);
+         let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=3`);
 
         let sdata = await s.json();
         let edata = await e.json();
@@ -253,10 +255,8 @@ async function startNav(){
             return;
         }
 
-        let sFeature = sdata.features.find(f => 
-    f.properties.label.toLowerCase().includes(start.toLowerCase())
-) || sdata.features[0]; || sdata.features[0];
-        let eFeature = edata.features.find(f => f.properties.country === "India") || edata.features[0];
+        let sFeature = sdata.features[0];
+        let eFeature = edata.features[0];
 
         let sCoord = sFeature.geometry.coordinates;
         let eCoord = eFeature.geometry.coordinates;
