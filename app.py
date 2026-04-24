@@ -226,7 +226,46 @@ def dashboard():
     conn.close()
 
     return render_template('dashboard.html', data=data)
+# ================= ADMIN =================
+@app.route('/admin')
+def admin():
+    if 'user_id' not in session or session['user_id'] != 999:
+        return "Access Denied"
 
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, username FROM users")
+    users = cur.fetchall()
+
+    conn.close()
+
+    return render_template('admin.html', users=users)
+
+# ================= USER DETAIL =================
+@app.route('/user/<username>')
+def user_detail(username):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM users WHERE username=%s",(username,))
+    user = cur.fetchone()
+
+    if not user:
+        return "User not found"
+
+    cur.execute("""
+    SELECT deviations, stops, confusion, score, driver_type, timestamp
+    FROM driving_data
+    WHERE user_id=%s
+    ORDER BY timestamp DESC
+    """,(user[0],))
+
+    data = cur.fetchall()
+    conn.close()
+
+    return render_template("user_detail.html", username=username, data=data)
 
 # ================= RUN =================
 if __name__ == "__main__":
