@@ -115,6 +115,11 @@ let lastLon = null;
 let warningGiven = false;
 let lastUpdate = 0;
 let navigationStarted = false;
+let deviationCount = 0;
+let stopCount = 0;
+let confusionCount = 0;
+let lastSpeed = 0;
+let lastTime = Date.now();
 
 
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -130,6 +135,27 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
     let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
+}
+
+function snapToRoute(lat, lon){
+    if(!routeCoords.length) return [lat, lon];
+
+    let closest = null;
+    let minDist = Infinity;
+
+    routeCoords.forEach(coord=>{
+        let rLat = coord[1];
+        let rLon = coord[0];
+
+        let d = getDistance(lat, lon, rLat, rLon);
+
+        if(d < minDist){
+            minDist = d;
+            closest = [rLat, rLon];
+        }
+    });
+
+    return closest || [lat, lon];
 }
 
 /* Off Route */
@@ -169,10 +195,14 @@ function smoothLocation(lat, lon){
 
     return [avgLat, avgLon];
 }
-    let rawLat = position.coords.latitude;
+  let rawLat = position.coords.latitude;
     let rawLon = position.coords.longitude;
 
     let [lat, lon] = smoothLocation(rawLat, rawLon);
+
+    if (navigationStarted) {
+        [lat, lon] = snapToRoute(lat, lon);
+    }
 
     // ✅ Marker
     if (userMarker) {
@@ -198,6 +228,29 @@ function smoothLocation(lat, lon){
     }
 
     let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
+    let now = Date.now();
+let timeDiff = (now - lastTime) / 1000;
+
+let dist = getDistance(lat, lon, lastLat, lastLon);
+let speed = (dist / timeDiff) * 3600;
+
+// 🚨 STOP
+if(speed < 5){
+    stopCount++;
+}
+
+// 🚨 HARSH BRAKE
+if(lastSpeed - speed > 20){
+    confusionCount++;
+}
+
+// 🚨 OFF ROUTE
+if(isOffRoute(lat, lon)){
+    deviationCount++;
+}
+
+lastSpeed = speed;
+lastTime = now;
 
     if (!started && distanceMoved > 0.02) {
         started = true;
@@ -255,8 +308,16 @@ async function startNav(){
             return;
         }
 
-        let sFeature = sdata.features[0];
-        let eFeature = edata.features[0];
+      function getBestMatch(features, input){
+    input = input.toLowerCase();
+
+    return features.find(f => 
+        f.properties.label.toLowerCase().includes(input)
+    ) || features[0];
+}
+
+let sFeature = getBestMatch(sdata.features, start);
+let eFeature = getBestMatch(edata.features, end);
 
         let sCoord = sFeature.geometry.coordinates;
         let eCoord = eFeature.geometry.coordinates;
@@ -352,22 +413,25 @@ document.getElementById("routeInfo").innerHTML =
    }catch(err){ console.log(err); alert("Route error. Check API key."); } }
 
 /* 🚨 WRONG ROUTE */
+let offRouteTimer = 0;
+
 function checkRoute(lat, lon) {
 
-    let offRoute = isOffRoute(lat, lon);
-
-    if (offRoute && !warningGiven) {
+    if(isOffRoute(lat, lon)){
+        offRouteTimer++;
+    if(offRouteTimer > 3 && !rerouting){
+        rerouting = true;
         speak("You are on wrong route");
         alert("⚠️ Wrong Route!");
-        rerouting = true;
-
-        reroute(lat, lon); // auto fix route
+        reroute(lat, lon);
+        offRouteTimer = 0;
 
         warningGiven = true;
     }
+    }
 
-    if (!offRoute) {
-        warningGiven = false;
+    else {
+        offRouteTimer = 0;
     }
 }
 
@@ -421,13 +485,13 @@ function saveBehavior(lat,lon){
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-    deviations: Math.floor(Math.random()*3),
-    stops: Math.floor(Math.random()*3),
-    confusion: rerouting ? 1 : 0,
-    speed: Math.random()*80,   // NEW
-    braking: Math.random()*5,  // NEW
-    lat: lat,
-    lon: lon
+        deviations: deviationCount,
+        stops: stopCount,
+        confusion: confusionCount,
+        speed: Math.random()*80,   // NEW
+        braking: Math.random()*5,  // NEW
+        lat: lat,
+        lon: lon
 })
         })
     }
