@@ -187,7 +187,7 @@ function smoothLocation(lat, lon){
     }
 
     if (navigationStarted) {
-    map.setView([lat, lon], 13);
+    map.panTo([lat, lon]); // smooth movement
 }
 
     // ✅ FIRST TIME SKIP
