@@ -1,514 +1,2119 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Smart Navigation</title>
-
+<title>DriveIQ – Smart Navigation</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- Leaflet CSS - multiple fallbacks -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<!-- Leaflet JS -->
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;}
-#map{
-position:absolute;
-top:0;
-left:0;
-width:100%;
-height:100%;
-z-index:1;
+:root {
+  --bg:#07090f; --s1:#0d1117; --s2:#161d2e; --s3:#1e2740;
+  --acc:#3b82f6; --acc2:#06b6d4; --grn:#10b981; --org:#f59e0b;
+  --red:#ef4444; --pur:#8b5cf6; --txt:#f1f5f9; --mu:#64748b;
+  --bdr:rgba(255,255,255,0.07); --glass:rgba(13,17,23,0.95); --radius:16px;
 }
-.search-box{
-position:absolute;top:20px;left:50%;
-transform:translateX(-50%);
-background:white;padding:15px;border-radius:12px;
-box-shadow:0 4px 15px rgba(0,0,0,0.2);
-width:300px;z-index:1000;
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; width:100%; overflow:hidden; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--txt); }
+
+#map {
+  position:absolute; top:0; left:0;
+  width:100%; height:100%;
+  z-index:1;
+  filter:saturate(0.65) brightness(0.8);
+  background:#0d1117;
 }
-.search-box input,.search-box select{
-width:100%;padding:10px;margin:6px 0;
-border-radius:8px;border:1px solid #ccc;
+
+.panel {
+  background:var(--glass); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+  border:1px solid var(--bdr); border-radius:var(--radius);
+  box-shadow:0 24px 64px rgba(0,0,0,0.55);
 }
-.search-box button{
-width:100%;padding:12px;margin-top:8px;
-background:#1a73e8;color:white;border:none;
-border-radius:8px;font-size:15px;font-weight:bold;
-cursor:pointer;
+
+/* ── SEARCH PANEL ── */
+#searchPanel {
+  position:absolute; top:12px; left:12px;
+  width:300px; z-index:1000; padding:14px 16px;
 }
-.floating{
-position:absolute;bottom:20px;right:20px;
-display:flex;flex-direction:column;gap:10px;z-index:1000;
+@media(max-width:480px){
+  #searchPanel { width:calc(100vw - 24px); padding:10px 12px; }
 }
-.floating button{
-width:55px;height:55px;border-radius:50%;
-border:none;font-size:18px;background:#1a73e8;
-color:white;cursor:pointer;
+
+.logo {
+  font-family:'Syne',sans-serif; font-size:16px; font-weight:800;
+  background:linear-gradient(120deg,var(--acc),var(--acc2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;
 }
-.top-menu{
-position:absolute;top:20px;right:20px;z-index:1000;
+.collapse-btn { background:none; border:none; color:var(--mu); cursor:pointer; font-size:14px; display:none; padding:0; -webkit-text-fill-color:var(--mu); }
+@media(max-width:480px){ .collapse-btn{display:block;} }
+
+#panelBody { transition:max-height 0.3s ease, opacity 0.3s ease; overflow:hidden; max-height:500px; }
+#panelBody.collapsed { max-height:0; opacity:0; }
+
+.input-row { position:relative; margin-bottom:7px; }
+.dot-indicator { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:8px; height:8px; border-radius:50%; }
+.dot-start { background:var(--grn); box-shadow:0 0 6px var(--grn); }
+.dot-end   { background:var(--red); box-shadow:0 0 6px var(--red); }
+
+.nav-input {
+  width:100%; padding:9px 10px 9px 26px;
+  background:var(--s2); border:1px solid var(--bdr);
+  border-radius:9px; color:var(--txt);
+  font-family:'DM Sans',sans-serif; font-size:13px; outline:none;
+  transition:border-color 0.2s;
 }
-.top-menu a{
-margin-left:10px;text-decoration:none;background:white;
-padding:8px 12px;border-radius:8px;color:#333;font-weight:bold;
+.nav-input:focus { border-color:var(--acc); }
+.nav-input::placeholder { color:var(--mu); }
+
+#routeInfoBar { font-size:11px; color:var(--acc2); padding:4px 2px; min-height:18px; font-weight:500; }
+
+.btn-primary {
+  width:100%; padding:10px;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));
+  border:none; border-radius:9px; color:white;
+  font-family:'Syne',sans-serif; font-size:13px; font-weight:700;
+  cursor:pointer; margin-top:4px; transition:opacity 0.2s, transform 0.1s;
 }
-.info-box{
-position:absolute;bottom:20px;left:20px;background:white;
-padding:12px;border-radius:10px;font-size:14px;
+.btn-primary:hover  { opacity:0.9; transform:translateY(-1px); }
+.btn-primary:active { transform:translateY(0); }
+.btn-primary:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+
+.lang-select {
+  width:100%; margin-top:7px; padding:7px 10px;
+  background:var(--s2); border:1px solid var(--bdr);
+  border-radius:9px; color:var(--mu); font-size:12px; outline:none;
 }
+
+#profileChip {
+  display:flex; align-items:center; gap:7px;
+  margin-top:8px; padding:7px 10px;
+  background:var(--s2); border:1px solid var(--bdr); border-radius:9px; font-size:11px;
+}
+.skill-badge { padding:2px 7px; border-radius:20px; font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; }
+.skill-expert   { background:rgba(16,185,129,0.2);  color:#34d399; }
+.skill-average  { background:rgba(245,158,11,0.2);  color:#fbbf24; }
+.skill-beginner { background:rgba(139,92,246,0.2);  color:#a78bfa; }
+
+/* ── ROUTE SHEET ── */
+#routeSheet {
+  position:absolute; bottom:0; left:0; right:0; z-index:1100;
+  background:var(--glass); backdrop-filter:blur(28px);
+  border-top:1px solid var(--bdr); border-radius:24px 24px 0 0;
+  padding:0 0 20px;
+  transform:translateY(100%);
+  transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);
+  max-height:72vh; overflow-y:auto;
+}
+#routeSheet.open { transform:translateY(0); }
+.sheet-handle { width:36px; height:4px; background:var(--bdr); border-radius:2px; margin:10px auto 0; }
+.sheet-title  { font-family:'Syne',sans-serif; font-size:14px; font-weight:700; padding:12px 16px 2px; }
+.sheet-sub    { font-size:11px; color:var(--mu); padding:0 16px 12px; }
+.route-cards  { display:flex; flex-direction:column; gap:8px; padding:0 12px; }
+
+.route-card {
+  display:flex; align-items:stretch;
+  background:var(--s2); border:1.5px solid var(--bdr);
+  border-radius:12px; cursor:pointer; overflow:hidden;
+  transition:border-color 0.2s, transform 0.12s;
+}
+.route-card:hover        { border-color:var(--acc); transform:translateY(-1px); }
+.route-card.selected     { border-color:var(--acc); background:rgba(59,130,246,0.08); }
+.route-card.recommended-card { border-color:var(--grn); }
+.route-card-accent { width:3px; flex-shrink:0; background:var(--mu); }
+.route-card.recommended-card .route-card-accent { background:var(--grn); }
+.route-card-body  { flex:1; padding:11px 12px; }
+.route-card-top   { display:flex; align-items:center; justify-content:space-between; margin-bottom:2px; }
+.route-label      { font-family:'Syne',sans-serif; font-size:13px; font-weight:700; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.rec-badge        { font-size:9px; padding:2px 6px; border-radius:20px; background:rgba(16,185,129,0.2); color:#34d399; font-weight:700; text-transform:uppercase; }
+.suit-badge       { font-size:10px; padding:2px 7px; border-radius:20px; font-weight:600; white-space:nowrap; }
+.suit-best  { background:rgba(16,185,129,0.15); color:#34d399; }
+.suit-good  { background:rgba(59,130,246,0.15);  color:#93c5fd; }
+.suit-low   { background:rgba(239,68,68,0.10);   color:#fca5a5; }
+.route-stats  { font-size:11px; color:var(--mu); margin-top:2px; }
+.route-reason { font-size:10px; color:var(--acc2); margin-top:4px; font-style:italic; }
+.select-btn {
+  align-self:center; margin-right:10px; padding:6px 12px;
+  background:var(--acc); border:none; border-radius:7px;
+  color:white; font-size:11px; font-weight:700; cursor:pointer;
+  font-family:'Syne',sans-serif; white-space:nowrap; flex-shrink:0; transition:opacity 0.2s;
+}
+.select-btn:hover { opacity:0.85; }
+
+/* ── SUMMARY SHEET ── */
+#summarySheet {
+  position:absolute; bottom:0; left:0; right:0; z-index:1200;
+  background:var(--glass); backdrop-filter:blur(28px);
+  border-top:1px solid var(--bdr); border-radius:24px 24px 0 0;
+  padding:0 16px 28px; transform:translateY(100%);
+  transition:transform 0.4s cubic-bezier(0.32,0.72,0,1);
+  max-height:80vh; overflow-y:auto;
+}
+#summarySheet.open { transform:translateY(0); }
+.summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:14px 0; }
+.summary-stat { background:var(--s2); border:1px solid var(--bdr); border-radius:10px; padding:12px 8px; text-align:center; }
+.summary-stat-val { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; line-height:1; }
+.summary-stat-label { font-size:10px; color:var(--mu); margin-top:3px; text-transform:uppercase; letter-spacing:0.4px; }
+.suggestion-item { padding:9px 12px; border-radius:9px; background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.18); font-size:12px; margin-bottom:7px; line-height:1.4; }
+
+/* ── CONFUSION OVERLAY ── */
+#confusionOverlay {
+  position:absolute; top:70px; left:50%; transform:translateX(-50%);
+  z-index:1300; min-width:240px; max-width:300px;
+  background:rgba(245,158,11,0.95); color:white;
+  padding:11px 16px; border-radius:12px;
+  font-size:12px; font-weight:600; text-align:center;
+  display:none; animation:pulse 1.5s infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 8px 32px rgba(245,158,11,0.4)}50%{box-shadow:0 8px 48px rgba(245,158,11,0.7)}}
+
+/* ── ARROW ── */
+#arrowOverlay { position:absolute; bottom:160px; right:12px; z-index:1100; display:none; flex-direction:column; align-items:center; gap:3px; }
+.big-arrow { font-size:52px; filter:drop-shadow(0 0 12px rgba(59,130,246,0.8)); animation:arrowB 0.7s ease infinite alternate; }
+@keyframes arrowB{from{transform:scale(1)}to{transform:scale(1.1)}}
+.arrow-label { background:var(--acc); color:white; padding:3px 12px; border-radius:20px; font-size:10px; font-weight:700; font-family:'Syne',sans-serif; }
+
+/* ── TOP MENU ── */
+.top-menu { position:absolute; top:12px; right:12px; z-index:1000; display:flex; gap:7px; }
+.menu-btn {
+  background:var(--glass); backdrop-filter:blur(20px); border:1px solid var(--bdr);
+  color:var(--txt); padding:8px 14px; border-radius:9px; text-decoration:none;
+  font-size:12px; font-weight:500; transition:0.2s; display:flex; align-items:center; gap:5px;
+}
+.menu-btn:hover { border-color:var(--acc); }
+
+/* ── END NAV BTN ── */
+#endNavBtn {
+  position:absolute; top:12px; right:12px; z-index:1001;
+  padding:8px 16px; background:var(--red); border:none;
+  border-radius:9px; color:white; font-family:'Syne',sans-serif;
+  font-size:12px; font-weight:700; cursor:pointer; display:none; transition:opacity 0.2s;
+}
+#endNavBtn:hover { opacity:0.85; }
+
+/* ── SCORE CARD ── (above status bar, no overlap with FABs) */
+#scoreCard {
+  position:absolute; bottom:56px; left:12px;
+  z-index:1000; padding:12px 16px; display:none; min-width:155px;
+}
+#scoreCard.visible { display:block; }
+.score-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--mu); }
+.score-val   { font-family:'Syne',sans-serif; font-size:36px; font-weight:800; line-height:1; }
+.score-val.safe{color:var(--grn)} .score-val.avg{color:var(--org)} .score-val.risk{color:var(--red)}
+.focus-bar-wrap   { margin-top:5px; }
+.focus-bar-label  { font-size:10px; color:var(--mu); margin-bottom:3px; }
+.focus-bar        { height:3px; background:var(--s3); border-radius:2px; overflow:hidden; }
+.focus-bar-fill   { height:100%; border-radius:2px; transition:width 0.5s ease; background:var(--acc); }
+
+/* ── STATUS BAR ── */
+#statusBar {
+  position:absolute; bottom:12px; left:12px;
+  z-index:1000; padding:8px 14px;
+  display:flex; gap:14px; align-items:center; font-size:11px;
+}
+.status-item { color:var(--mu); }
+.status-item span { color:var(--txt); font-weight:600; }
+
+/* ── FABs ── right side, won't clash with score card on left */
+.fabs { position:absolute; bottom:12px; right:12px; display:flex; flex-direction:column; gap:8px; z-index:1000; }
+.fab {
+  width:44px; height:44px; border-radius:50%;
+  background:var(--glass); backdrop-filter:blur(20px);
+  border:1px solid var(--bdr); color:var(--txt);
+  font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:0.2s; position:relative;
+}
+.fab:hover { border-color:var(--acc); transform:scale(1.08); }
+.fab-label {
+  position:absolute; right:52px; background:var(--s2); border:1px solid var(--bdr);
+  border-radius:7px; padding:3px 8px; font-size:10px; white-space:nowrap;
+  opacity:0; pointer-events:none; transition:opacity 0.2s;
+}
+.fab:hover .fab-label { opacity:1; }
+
+/* ── ETA BAR ── */
+#etaBar {
+  position:absolute; bottom:0; left:0; right:0; z-index:999;
+  background:var(--glass); backdrop-filter:blur(24px); border-top:1px solid var(--bdr);
+  padding:10px 20px; display:none; align-items:center; justify-content:space-around;
+}
+#etaBar.show { display:flex; }
+.eta-item    { display:flex; flex-direction:column; align-items:center; }
+.eta-val     { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; }
+.eta-label   { font-size:9px; color:var(--mu); text-transform:uppercase; letter-spacing:0.5px; margin-top:1px; }
+
+/* ── TOAST ── */
+#toast {
+  position:absolute; top:12px; left:50%; z-index:2000;
+  transform:translateX(-50%) translateY(-70px);
+  background:var(--s2); border:1px solid var(--bdr); color:var(--txt);
+  padding:9px 16px; border-radius:10px; font-size:12px; font-weight:500;
+  transition:transform 0.3s ease; max-width:260px; text-align:center; pointer-events:none;
+}
+#toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ══════════════════════════════
+   PHASE 2 CSS
+══════════════════════════════ */
+
+/* ── HEATMAP TOGGLE BTN ── */
+#heatmapBtn {
+  position:absolute; bottom:220px; right:12px; z-index:1000;
+  width:44px; height:44px; border-radius:50%;
+  background:var(--glass); backdrop-filter:blur(20px);
+  border:1px solid var(--bdr); color:var(--txt);
+  font-size:17px; cursor:pointer; display:flex;
+  align-items:center; justify-content:center; transition:0.2s;
+}
+#heatmapBtn.active { border-color:var(--red); background:rgba(239,68,68,0.15); }
+#heatmapBtn:hover  { border-color:var(--acc); transform:scale(1.08); }
+
+/* ── DANGER ZONE ALERT ── */
+#dangerAlert {
+  position:absolute; top:110px; left:50%; transform:translateX(-50%);
+  z-index:1300; min-width:250px; max-width:320px;
+  background:rgba(239,68,68,0.96); color:white;
+  padding:12px 18px; border-radius:12px;
+  font-size:13px; font-weight:600; text-align:center;
+  display:none; animation:dangerPulse 1s infinite;
+  box-shadow:0 8px 32px rgba(239,68,68,0.5);
+}
+@keyframes dangerPulse{0%,100%{box-shadow:0 8px 32px rgba(239,68,68,0.4)}50%{box-shadow:0 8px 48px rgba(239,68,68,0.8)}}
+
+/* ── TURN DIFFICULTY BADGE ── */
+#turnDiffBadge {
+  position:absolute; top:110px; right:12px; z-index:1050;
+  padding:6px 12px; border-radius:10px; font-size:12px;
+  font-weight:700; font-family:'Syne',sans-serif;
+  display:none; border:1px solid var(--bdr);
+  background:var(--glass); backdrop-filter:blur(20px);
+}
+
+/* ── ROUTE MEMORY BANNER ── */
+#routeMemoryBanner {
+  position:absolute; bottom:0; left:0; right:0; z-index:1090;
+  background:linear-gradient(135deg,rgba(139,92,246,0.95),rgba(59,130,246,0.95));
+  backdrop-filter:blur(20px);
+  padding:12px 20px; display:none;
+  align-items:center; justify-content:space-between; gap:12px;
+  border-top:1px solid rgba(255,255,255,0.15);
+}
+#routeMemoryBanner.show { display:flex; }
+.memory-text  { font-size:13px; font-weight:600; flex:1; }
+.memory-close { background:none; border:none; color:white; font-size:18px; cursor:pointer; padding:0 4px; }
+
+/* ── OFFLINE BANNER ── */
+#offlineBanner {
+  position:absolute; top:0; left:0; right:0; z-index:2000;
+  background:var(--org); color:white;
+  padding:8px 16px; text-align:center; font-size:12px; font-weight:600;
+  display:none;
+}
+#offlineBanner.show { display:block; }
+
+/* ── LANE ARROWS ── */
+#laneGuide {
+  position:absolute; bottom:55px; left:50%; transform:translateX(-50%);
+  z-index:1060; display:none;
+  gap:6px; align-items:center;
+}
+#laneGuide.show { display:flex; }
+.lane-arrow {
+  width:36px; height:36px; border-radius:8px;
+  background:var(--s2); border:2px solid var(--bdr);
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; transition:0.2s;
+}
+.lane-arrow.active { border-color:var(--acc); background:rgba(59,130,246,0.2); }
+
+/* ── ROTATING USER ARROW MARKER ── */
+.user-arrow-marker {
+  background: none !important;
+  border: none !important;
+}
+.arrow-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg,#3b82f6,#06b6d4);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.3), 0 4px 16px rgba(59,130,246,0.5);
+  transition: transform 0.3s ease;
+  position: relative;
+}
+.arrow-icon::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 10px; height: 10px;
+  background: white;
+  border-radius: 50%;
+}
+
+/* ── NEXT INSTRUCTION BANNER ── */
+#instructionBanner {
+  position: absolute;
+  top: 60px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 1050;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--bdr);
+  border-radius: 14px;
+  padding: 10px 18px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  min-width: 260px;
+  max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+#instructionBanner.show { display: flex; }
+#instrArrow { font-size: 28px; flex-shrink: 0; }
+#instrText  { font-size: 13px; font-weight: 600; flex: 1; line-height: 1.3; }
+#instrDist  { font-size: 11px; color: var(--acc2); margin-top: 2px; font-weight: 500; }
+
+/* ── ROUTE PROGRESS BAR ── */
+#progressBar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--s3);
+  z-index: 1050;
+  display: none;
+}
+#progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--grn), var(--acc));
+  transition: width 1s ease;
+  width: 0%;
+}
+
+/* ── PHASE 2: HEATMAP TOGGLE ── */
+#heatmapBtn {
+  position:absolute; top:52px; right:12px; z-index:1000;
+  padding:7px 14px; background:var(--glass); backdrop-filter:blur(20px);
+  border:1px solid var(--bdr); color:var(--mu);
+  border-radius:9px; font-size:12px; font-weight:500;
+  cursor:pointer; display:none; transition:0.2s;
+}
+#heatmapBtn.active { border-color:var(--red); color:var(--red); }
+#heatmapBtn:hover  { border-color:var(--acc); color:var(--txt); }
+
+/* ── OFFLINE BANNER ── */
+#offlineBanner {
+  position:absolute; top:0; left:0; right:0; z-index:2100;
+  background:var(--org); color:white;
+  padding:8px 16px; font-size:13px; font-weight:600;
+  text-align:center; display:none;
+}
+
+/* ── ROUTE MEMORY BANNER ── */
+#routeMemoryBanner {
+  position:absolute; bottom:60px; left:50%;
+  transform:translateX(-50%);
+  z-index:1050; max-width:340px; width:90%;
+  background:var(--glass); backdrop-filter:blur(20px);
+  border:1px solid rgba(139,92,246,0.4);
+  border-radius:14px; padding:14px 16px;
+  display:none; flex-direction:column; gap:8px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+#routeMemoryBanner.show { display:flex; }
+.memory-title { font-family:'Syne',sans-serif; font-size:13px; font-weight:700; color:var(--pur); }
+.memory-tip   { font-size:12px; color:var(--txt); line-height:1.4; }
+.memory-close { align-self:flex-end; background:none; border:none; color:var(--mu); cursor:pointer; font-size:18px; padding:0; }
+
+/* ── TURN DIFFICULTY BADGE (on instruction banner) ── */
+#turnDiffBadge {
+  display:none; padding:2px 8px; border-radius:20px;
+  font-size:10px; font-weight:700; margin-top:3px;
+}
+.diff-easy   { background:rgba(16,185,129,0.2);  color:#34d399; }
+.diff-medium { background:rgba(245,158,11,0.2);  color:#fbbf24; }
+.diff-hard   { background:rgba(239,68,68,0.2);   color:#f87171; }
+
+/* ── LANE ARROWS ── */
+#lanePanel {
+  position:absolute; bottom:52px; left:50%;
+  transform:translateX(-50%);
+  z-index:1060; display:none; gap:6px; align-items:center;
+  background:var(--glass); backdrop-filter:blur(20px);
+  border:1px solid var(--bdr); border-radius:12px;
+  padding:8px 16px;
+}
+#lanePanel.show { display:flex; }
+.lane-arrow {
+  font-size:22px; opacity:0.3; transition:opacity 0.3s, transform 0.3s;
+}
+.lane-arrow.active { opacity:1; filter:drop-shadow(0 0 8px var(--acc)); }
+
+/* ── DANGER ZONE PULSE ── */
+@keyframes dangerPulse {
+  0%   { box-shadow:0 0 0 0 rgba(239,68,68,0.6); }
+  70%  { box-shadow:0 0 0 20px rgba(239,68,68,0); }
+  100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+}
+.danger-zone-marker { animation:dangerPulse 1.5s infinite; }
+
+/* ── LOADING ── */
+#loading {
+  position:absolute; inset:0; background:rgba(7,9,15,0.75); z-index:1500;
+  display:none; align-items:center; justify-content:center; flex-direction:column; gap:10px;
+}
+#loading.show { display:flex; }
+.spinner { width:32px; height:32px; border:3px solid var(--bdr); border-top-color:var(--acc); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text { font-family:'Syne',sans-serif; font-size:13px; color:var(--txt); }
+.loading-sub  { font-size:11px; color:var(--mu); }
 </style>
 </head>
-
 <body>
 
-
 <div id="map"></div>
-<div class="search-box">
-<input id="start" placeholder="Start location">
-<input id="end" placeholder="Destination">
-<div id="routeInfo" style="margin-top:8px;color:#333;font-size:14px;">
-Distance: -- km | Time: -- min
-</div>
-<button onclick="startNav()">🚀 Start</button>
+<div id="loading"><div class="spinner"></div><div class="loading-text" id="loadingText">Finding routes...</div><div class="loading-sub" id="loadingSub"></div></div>
+<div id="toast"></div>
+<div id="progressBar"><div id="progressFill"></div></div>
 
-<select id="lang">
-<option>English</option>
-<option>Hindi</option>
-<option>Telugu</option>
-</select>
-</div>
-
-<div class="top-menu">
-<a href="/dashboard">📊 Dashboard</a>
-<a href="/logout">🚪 Logout</a>
+<!-- Next instruction banner -->
+<div id="instructionBanner">
+  <div id="instrArrow">⬆️</div>
+  <div style="flex:1">
+    <div id="instrText">Follow the route</div>
+    <div id="instrDist"></div>
+    <div id="turnDiffBadge"></div>
+  </div>
 </div>
 
-<div class="floating">
-<button onclick="findPlace('fuel')">⛽</button>
-<button onclick="findPlace('hotel')">🏨</button>
-<button onclick="findPlace('atm')">🏧</button>
+<div id="confusionOverlay"></div>
+<div id="arrowOverlay"><div class="big-arrow" id="bigArrow">➡️</div><div class="arrow-label" id="arrowLabel">Turn Right</div></div>
+
+<!-- PHASE 2 UI ELEMENTS -->
+<div id="offlineBanner">📵 Offline mode — using cached route</div>
+<div id="dangerAlert"></div>
+<div id="turnDiffBadge"></div>
+<div id="routeMemoryBanner">
+  <div class="memory-text" id="memoryText">You've done this route before!</div>
+  <button class="memory-close" onclick="closeMemoryBanner()">✕</button>
+</div>
+<button id="heatmapBtn" onclick="toggleHeatmap()" title="Toggle mistake heatmap">🔥</button>
+<div id="laneGuide"></div>
+
+<!-- Search Panel -->
+<div class="panel" id="searchPanel">
+  <div class="logo">
+    ⚡ DriveIQ
+    <button class="collapse-btn" onclick="togglePanel()">▼</button>
+  </div>
+  <div id="panelBody">
+    <div class="input-row">
+      <div class="dot-indicator dot-start"></div>
+      <input class="nav-input" id="startInput" placeholder="Start location" autocomplete="off">
+    </div>
+    <div class="input-row">
+      <div class="dot-indicator dot-end"></div>
+      <input class="nav-input" id="endInput" placeholder="Destination" autocomplete="off">
+    </div>
+    <div id="routeInfoBar">Enter locations to get started</div>
+    <button class="btn-primary" id="findRoutesBtn" onclick="findRoutes()">🔍 Find Best Routes</button>
+    <select class="lang-select" id="langSelect" onchange="setVoiceLang()">
+      <option value="en-IN">🌐 English</option>
+      <option value="hi-IN">🇮🇳 Hindi</option>
+      <option value="te-IN">Telugu</option>
+      <option value="mr-IN">Marathi</option>
+      <option value="ta-IN">Tamil</option>
+      <option value="kn-IN">Kannada</option>
+      <option value="bn-IN">Bengali</option>
+    </select>
+    <div id="profileChip">
+      <span>🧠</span>
+      <span id="profileSkillBadge" class="skill-badge skill-beginner">--</span>
+      <span id="profileDesc" style="color:var(--mu);font-size:10px;flex:1">Loading...</span>
+      <span id="focusIndicator" style="font-size:10px;color:var(--acc2)">--</span>
+    </div>
+  </div>
 </div>
 
+<!-- Top menu -->
+<div class="top-menu" id="topMenu">
+  <a href="/dashboard" class="menu-btn">📊 Dashboard</a>
+  <a href="/logout" class="menu-btn">🚪 Logout</a>
+</div>
+
+<!-- End nav (replaces top menu during navigation) -->
+<button id="endNavBtn" onclick="endNavigation()">■ End Trip</button>
+
+<!-- Score card -->
+<div class="panel" id="scoreCard">
+  <div class="score-label">Live Score</div>
+  <div class="score-val" id="scoreVal">--</div>
+  <div style="font-size:11px;color:var(--mu);margin-top:2px" id="driverTypeLabel">--</div>
+  <div class="focus-bar-wrap">
+    <div class="focus-bar-label">Focus: <span id="focusLevelLabel">--</span></div>
+    <div class="focus-bar"><div class="focus-bar-fill" id="focusBarFill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="panel" id="statusBar">
+  <div class="status-item">📍 <span id="statusGps">Locating...</span></div>
+  <div class="status-item">🚗 <span id="statusSpeed">0 km/h</span></div>
+  <div class="status-item" id="statusRouteWrap" style="display:none">🗺 <span id="statusRoute">--</span></div>
+</div>
+
+<!-- ETA bar -->
+<div id="etaBar">
+  <div class="eta-item"><div class="eta-val" id="etaTime">--</div><div class="eta-label">Mins Left</div></div>
+  <div class="eta-item"><div class="eta-val" id="etaDist">--</div><div class="eta-label">KM Left</div></div>
+  <div class="eta-item"><div class="eta-val" id="etaScore">--</div><div class="eta-label">Score</div></div>
+</div>
+
+<!-- FABs -->
+<div class="fabs">
+  <button class="fab" onclick="findNearby('fuel')">⛽<span class="fab-label">Fuel Station</span></button>
+  <button class="fab" onclick="findNearby('hospital')">🏥<span class="fab-label">Hospital</span></button>
+  <button class="fab" onclick="findNearby('atm')">🏧<span class="fab-label">ATM</span></button>
+  <button class="fab" onclick="locateMe()">📍<span class="fab-label">My Location</span></button>
+  <button class="fab" onclick="toggleHeatmap()" id="heatmapFab" title="Heatmap">🔥<span class="fab-label">Mistake Heatmap</span></button>
+</div>
+
+<!-- Offline banner -->
+<div id="offlineBanner">📡 Offline Mode — Using cached route</div>
+
+<!-- Heatmap toggle button (shown after nav starts) -->
+<button id="heatmapBtn" onclick="toggleHeatmap()">🔥 Heatmap</button>
+
+<!-- Route memory banner -->
+<div id="routeMemoryBanner">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div class="memory-title">🧠 Route Memory</div>
+    <button class="memory-close" onclick="document.getElementById('routeMemoryBanner').classList.remove('show')">×</button>
+  </div>
+  <div id="memoryTips"></div>
+</div>
+
+<!-- Lane panel -->
+<div id="lanePanel">
+  <div class="lane-arrow" id="lane-left">↖️</div>
+  <div class="lane-arrow" id="lane-straight">⬆️</div>
+  <div class="lane-arrow" id="lane-right">↗️</div>
+</div>
+
+<!-- Turn difficulty badge added inside instruction banner -->
+
+<!-- Route Sheet -->
+<div id="routeSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">🗺 Choose Your Route</div>
+  <div class="sheet-sub" id="sheetSub">Personalized for your driving style</div>
+  <div class="route-cards" id="routeCards"></div>
+  <div style="padding:12px 12px 0">
+    <button class="btn-primary" id="startNavBtn" disabled onclick="startSelectedRoute()">Select a Route Above</button>
+  </div>
+</div>
+
+<!-- Summary Sheet -->
+<div id="summarySheet">
+  <div class="sheet-handle"></div>
+  <div style="padding:12px 0 0">
+    <div class="sheet-title" style="padding:0 0 4px">🏁 Ride Complete</div>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div id="suggestionsList"></div>
+    <button class="btn-primary" onclick="closeSummary()" style="margin-top:10px">Back to Map</button>
+  </div>
+</div>
 
 <script>
-
 const API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImUyNjVjNzM5YjIyYjQyN2RhMjY2OGQ5NmNhNzQ1ODBiIiwiaCI6Im11cm11cjY0In0=";
+const ORS    = "https://api.openrouteservice.org";
 
-window.addEventListener("offline", ()=>{
-    alert("⚠️ No Internet Connection!");
-});
+// ── STATE ──
+let map, userMarker, routeLine;
+let routeCoords=[], navigationStarted=false, followUser=false;
+let selectedRouteId=null, selectedRouteData=null;
+let driverProfile=null, voiceLang='en-IN';
+let geocodedStart=null, geocodedEnd=null;
+let deviationCount=0, stopCount=0, confusionCount=0;
+let lastLat=null, lastLon=null, lastSpeed=0, lastTime=Date.now();
+let offRouteTimer=0, rerouting=false, rerouteCount=0, slowTimer=0;
+let tripStartTime=null, totalDistKm=0, lastSave=0;
+let lastPositions=[], routeInstructions=[], currentInstIdx=0;
+let nearbyMarkers=[], routeDataMap={}, panelCollapsed=false;
 
-window.addEventListener("online", ()=>{
-    alert("✅ Back Online");
-});
+// ── NAVIGATION ENGINE STATE ──
+let closestRouteIdx = 0;       // index of closest point on routeCoords
+let remainingCoords = [];      // route coords NOT yet travelled
+let completedLine = null;      // grey polyline for completed route
+let remainingLine = null;      // blue polyline for remaining route
+let userHeading = 0;           // direction of travel in degrees
+let lastSpokenInstIdx = -1;    // prevent repeating same instruction
+let remainingDistKm = 0;       // accurate remaining distance
+let routeTotalDistKm = 0;      // total route distance
 
+// ── MAP INIT — guarded so it only runs after Leaflet loads ──
+function initMap() {
+  if (typeof L === 'undefined') {
+    console.warn('Leaflet not ready yet, retrying in 500ms...');
+    setTimeout(initMap, 500);
+    return;
+  }
 
-let map = L.map('map').setView([17.3850,78.4867], 13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  try {
+    map = L.map('map', {
+      zoomControl: false,
+      preferCanvas: true
+    }).setView([17.385, 78.4867], 13);
 
-let userMarker = null;
-let routeLine;
-let routeCoords = [];
-let rerouting = false;
-let started = false;
-let lastLat = null;
-let lastLon = null;
-let warningGiven = false;
-let lastUpdate = 0;
-let navigationStarted = false;
-let deviationCount = 0;
-let stopCount = 0;
-let confusionCount = 0;
-let lastSpeed = 0;
-let lastTime = Date.now();
-
-
-function getDistance(lat1, lon1, lat2, lon2) {
-    let R = 6371;
-    let dLat = (lat2 - lat1) * Math.PI / 180;
-    let dLon = (lon2 - lon1) * Math.PI / 180;
-
-    let a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-    let c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-
-function snapToRoute(lat, lon){
-    if(!routeCoords.length) return [lat, lon];
-
-    let closest = null;
-    let minDist = Infinity;
-
-    routeCoords.forEach(coord=>{
-        let rLat = coord[1];
-        let rLon = coord[0];
-
-        let d = getDistance(lat, lon, rLat, rLon);
-
-        if(d < minDist){
-            minDist = d;
-            closest = [rLat, rLon];
-        }
+    // Primary tile layer
+    const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OSM',
+      maxZoom: 19,
+      crossOrigin: true
     });
 
-    return closest || [lat, lon];
-}
-
-/* Off Route */
-function isOffRoute(lat, lon) {
-
-    if (!routeCoords || routeCoords.length === 0) return false;
-
-    let minDistance = Infinity;
-
-    routeCoords.forEach(coord => {
-        let routeLat = coord[1];
-        let routeLon = coord[0];
-
-        let dist = getDistance(lat, lon, routeLat, routeLon);
-
-        if (dist < minDistance) {
-            minDistance = dist;
-        }
+    tiles.on('tileerror', function() {
+      // Fallback tile layer if primary fails
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© OSM © CARTO', maxZoom: 19
+      }).addTo(map);
     });
 
-    // 🚨 if user is more than 100 meters away → off route
-    return minDistance > 0.1;
-}
-/* 📍 GPS */
+    tiles.addTo(map);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    let lastPositions = [];
-navigator.geolocation.watchPosition(
-function(position) {
-
-
-function smoothLocation(lat, lon){
-    lastPositions.push([lat, lon]);
-    if(lastPositions.length > 5) lastPositions.shift();
-
-    let avgLat = lastPositions.reduce((a,b)=>a+b[0],0)/lastPositions.length;
-    let avgLon = lastPositions.reduce((a,b)=>a+b[1],0)/lastPositions.length;
-
-    return [avgLat, avgLon];
-}
-  let rawLat = position.coords.latitude;
-    let rawLon = position.coords.longitude;
-
-    let [lat, lon] = smoothLocation(rawLat, rawLon);
-
-    if (navigationStarted) {
-        [lat, lon] = snapToRoute(lat, lon);
-    }
-
-    // ✅ Marker
-    if (userMarker) {
-        userMarker.setLatLng([lat, lon]);
-    } else {
-        userMarker = L.marker([lat, lon], {
-            icon: L.icon({
-                iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
-                iconSize: [30, 30]
-            })
-        }).addTo(map).bindPopup("You are here").openPopup();
-    }
-
-    if (navigationStarted) {
-    map.panTo([lat, lon]); // smooth movement
+    // Force map to recalculate size after render
+    setTimeout(() => map.invalidateSize(), 300);
+    console.log('✅ Map initialized');
+  } catch(e) {
+    console.error('Map init error:', e);
+  }
 }
 
-    // ✅ FIRST TIME SKIP
-    if (lastLat === null) {
-        lastLat = lat;
-        lastLon = lon;
-        return;
-    }
+// Try immediately, also try after DOM ready, also after window load
+initMap();
+document.addEventListener('DOMContentLoaded', () => { if (!map) initMap(); });
+window.addEventListener('load', () => { if (!map) initMap(); else map.invalidateSize(); });
 
-    let distanceMoved = getDistance(lat, lon, lastLat, lastLon);
-    let now = Date.now();
-let timeDiff = (now - lastTime) / 1000;
-
-let dist = getDistance(lat, lon, lastLat, lastLon);
-let speed = (dist / timeDiff) * 3600;
-
-// 🚨 STOP
-if(speed < 5){
-    stopCount++;
+// ── PANEL COLLAPSE (mobile) ──
+function togglePanel(){
+  panelCollapsed=!panelCollapsed;
+  document.getElementById('panelBody').classList.toggle('collapsed',panelCollapsed);
 }
 
-// 🚨 HARSH BRAKE
-if(lastSpeed - speed > 20){
-    confusionCount++;
+// ── PROFILE ──
+async function loadProfile(){
+  try{
+    const r = await fetch('/driver_profile');
+    // If session expired Flask returns 401 JSON — redirect to login
+    if(r.status === 401){ window.location.href='/login'; return; }
+    const ct = r.headers.get('content-type')||'';
+    if(!ct.includes('application/json')){
+      console.warn('Profile: unexpected response type, session may have expired');
+      window.location.href='/login'; return;
+    }
+    driverProfile = await r.json();
+    if(driverProfile.error){ window.location.href='/login'; return; }
+    updateProfileChip(driverProfile);
+  }catch(e){ console.warn('Profile load failed:', e); }
+}
+function updateProfileChip(p){
+  const b=document.getElementById('profileSkillBadge'),d=document.getElementById('profileDesc'),f=document.getElementById('focusIndicator');
+  b.textContent=p.skill_level; b.className='skill-badge skill-'+p.skill_level.toLowerCase();
+  d.textContent=p.total_rides===0?'New driver':`${p.total_rides} rides · Avg ${p.avg_score}`;
+  f.textContent='Focus: '+(p.focus_score>=75?'High 🟢':p.focus_score>=50?'Medium 🟡':'Low 🔴');
+}
+loadProfile();
+
+// ── VOICE ──
+function setVoiceLang(){voiceLang=document.getElementById('langSelect').value;}
+function speak(t){window.speechSynthesis.cancel();const m=new SpeechSynthesisUtterance(t);m.lang=voiceLang;window.speechSynthesis.speak(m);}
+function adaptiveSpeak(d,n,b){const s=driverProfile?.skill_level||'Beginner';speak(s==='Expert'?(b||n):s==='Average'?(n||d):(d||n));}
+
+// ── TOAST ──
+function toast(msg,dur=3000){const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),dur);}
+
+// ── LOADING ──
+function showLoading(t,s){document.getElementById('loadingText').textContent=t||'Loading...';document.getElementById('loadingSub').textContent=s||'';document.getElementById('loading').classList.add('show');}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+
+// ── CONFUSION ──
+let confTimer=null;
+function showConfusion(msg){const e=document.getElementById('confusionOverlay');e.textContent=msg;e.style.display='block';clearTimeout(confTimer);confTimer=setTimeout(()=>e.style.display='none',5000);}
+
+// ── ARROW ──
+function showArrow(dir,label){
+  const m={'right':'➡️','left':'⬅️','straight':'⬆️','slight right':'↗️','slight left':'↖️','sharp right':'↪️','sharp left':'↩️','u-turn':'🔄'};
+  document.getElementById('bigArrow').textContent=m[dir?.toLowerCase()]||'⬆️';
+  document.getElementById('arrowLabel').textContent=label||dir||'';
+  document.getElementById('arrowOverlay').style.display='flex';
+  setTimeout(()=>document.getElementById('arrowOverlay').style.display='none',6000);
 }
 
-// 🚨 OFF ROUTE
-if(isOffRoute(lat, lon)){
-    deviationCount++;
+// ── GEOCODE with timeout ──
+async function geocode(text){
+  const url=`${ORS}/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(text)}&boundary.country=IN&size=5`;
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),8000);
+  try{
+    const r=await fetch(url,{signal:ctrl.signal}); clearTimeout(t);
+    const d=await r.json();
+    if(!d.features?.length) return null;
+    const q=text.toLowerCase();
+    return d.features.find(f=>f.properties.label.toLowerCase().includes(q))||d.features[0];
+  }catch(e){clearTimeout(t);if(e.name==='AbortError')throw new Error('Geocode timed out');throw e;}
 }
 
-lastSpeed = speed;
-lastTime = now;
-
-    if (!started && distanceMoved > 0.02) {
-        started = true;
-        speak("Navigation started");
+// ── FETCH ORS ROUTE — genuinely different per type ──
+async function fetchRoute(sCoord,eCoord,type){
+  // OFFLINE MODE: serve cached route if no internet
+  if (isOffline) {
+    if (cachedRoute?.routeCoords) {
+      return {
+        features:[{
+          geometry:{ coordinates: cachedRoute.routeCoords },
+          properties:{
+            summary:{ distance: remainingDistKm*1000||10000, duration: remainingDistKm/30*3600||1200 },
+            segments:[{ steps: cachedRoute.instructions||[] }]
+          }
+        }]
+      };
     }
-
-    if (!started) return;
-
-    checkRoute(lat, lon);
-    saveBehavior(lat, lon);
-
-    lastLat = lat;
-    lastLon = lon;
-
-},
-function(error) {
-
-    console.log("GPS Error:", error);
-
-    if (error.code === 1) {
-        alert("Please allow location access!");
-    } else if (error.code === 2) {
-        alert("Location unavailable!");
-    } 
-
-},
-{
-    enableHighAccuracy: true,
-    maximumAge: 10000,
-    timeout: 20000
-});
-
-/* 🚀 START NAV */
-async function startNav(){
-
-    let start = document.getElementById("start").value;
-    let end = document.getElementById("end").value;
-
-    if(!start || !end){
-        alert("Enter locations");
-        return;
-    }
-
-    try{
-
-        // 🔍 GEOCODE
-         let s = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(start)}&boundary.country=IN&size=3`);
-         let e = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}&boundary.country=IN&size=3`);
-
-        let sdata = await s.json();
-        let edata = await e.json();
-
-        if (!sdata.features.length || !edata.features.length){
-            alert("Location not found");
-            return;
-        }
-
-      function getBestMatch(features, input){
-    input = input.toLowerCase();
-
-    return features.find(f => 
-        f.properties.label.toLowerCase().includes(input)
-    ) || features[0];
-}
-
-let sFeature = getBestMatch(sdata.features, start);
-let eFeature = getBestMatch(edata.features, end);
-
-        let sCoord = sFeature.geometry.coordinates;
-        let eCoord = eFeature.geometry.coordinates;
-
-        // 🚗 ROUTE API
-        let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
-            method:"POST",
-            headers:{
-                "Authorization":API_KEY,
-                "Content-Type":"application/json"
-            },
-            body: JSON.stringify({
-                coordinates:[sCoord,eCoord]
-            })
-        });
-
-        let routeData = await routeRes.json();
-
-        // ❌ ERROR CHECK
-        if (!routeData.features){
-            console.log(routeData);
-            alert("Route error. Check API key.");
-            return;
-        }
-
-        // 🗺️ REMOVE OLD ROUTE
-        if (routeLine) {
-            map.removeLayer(routeLine);
-        }
-
-        // 🟦 DRAW ROUTE
-        routeLine = L.geoJSON(routeData,{
-            style:{color:"blue",weight:6}
-        }).addTo(map);
-
-        map.fitBounds(routeLine.getBounds(), {
-    padding: [50, 50],   // adds space around route
-    maxZoom: 13          // 🚀 prevents too much zoom
-});
-        navigationStarted = true;
-        routeCoords = routeData.features[0].geometry.coordinates;
-
-        // 📍 MARKERS
-        if (window.startMarker) map.removeLayer(window.startMarker);
-        if (window.endMarker) map.removeLayer(window.endMarker);
-
-        window.startMarker = L.marker([sCoord[1], sCoord[0]])
-            .addTo(map)
-            .bindPopup("Start")
-            .openPopup();
-
-        window.endMarker = L.marker([eCoord[1], eCoord[0]])
-            .addTo(map)
-            .bindPopup("Destination");
-
-    
- // 📏 DISTANCE + TIME
-let feature = routeData.features[0];
-
-let distance = 0;
-let time = 0;
-
-// ✅ ALWAYS WORKING METHOD
-if (feature.properties) {
-
-    if (feature.properties.summary) {
-        distance = feature.properties.summary.distance || 0;
-        time = feature.properties.summary.duration || 0;
-    }
-
-    if ((distance === 0 || time === 0) && feature.properties.segments) {
-        feature.properties.segments.forEach(seg => {
-            distance += seg.distance || 0;
-            time += seg.duration || 0;
-        });
-    }
-}
-
-// DEBUG
-console.log("DIST:", distance, "TIME:", time);
-
-// FORMAT
-distance = (distance / 1000).toFixed(2);
-time = (time / 60).toFixed(0);
-
-// ✅ SHOW ONLY IN TOP BOX
-document.getElementById("routeInfo").innerHTML =
-    `Distance: ${distance} KM | Time: ${time} min`;
-
-document.getElementById("routeInfo").innerHTML =
-    `Distance: ${distance} KM | Time: ${time} min`;
-    
-   }catch(err){ console.log(err); alert("Route error. Check API key."); } }
-
-/* 🚨 WRONG ROUTE */
-let offRouteTimer = 0;
-
-function checkRoute(lat, lon) {
-
-    if(isOffRoute(lat, lon)){
-        offRouteTimer++;
-    if(offRouteTimer > 3 && !rerouting){
-        rerouting = true;
-        speak("You are on wrong route");
-        alert("⚠️ Wrong Route!");
-        reroute(lat, lon);
-        offRouteTimer = 0;
-
-        warningGiven = true;
-    }
-    }
-
-    else {
-        offRouteTimer = 0;
-    }
-}
-
-/* 🔁 REROUTE */
-async function reroute(lat,lon){
-
-    let end = document.getElementById("end").value;
-
-    let geoEnd = await fetch(`https://api.openrouteservice.org/geocode/search?api_key=${API_KEY}&text=${encodeURIComponent(end)}`);
-    let edata = await geoEnd.json();
-
-    let eFeature = edata.features.find(f => f.properties.country === "India") || edata.features[0];
-    let endCoord = eFeature.geometry.coordinates;
-
-    let routeRes = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson",{
-        method:"POST",
-        headers:{
-            "Authorization":API_KEY,
-            "Content-Type":"application/json"
-        },
-        body: JSON.stringify({
-            coordinates: [[lon,lat], endCoord]
-        })
+    toast('⚠️ Offline — no cached route available');
+    return null;
+  }
+  // FIX 3: Different ORS settings produce genuinely different routes
+  const configs={
+    fastest: {preference:'fastest'},
+    easiest: {preference:'shortest', options:{avoid_features:['highways','tollways','ferries']}},
+    balanced:{preference:'recommended'}
+  };
+  const cfg=configs[type]||configs.balanced;
+  const body={coordinates:[sCoord,eCoord],instructions:true,instructions_format:'text',...cfg};
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),12000);
+  try{
+    const r=await fetch(`${ORS}/v2/directions/driving-car/geojson`,{
+      method:'POST',headers:{'Authorization':API_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal:ctrl.signal
     });
-
-    let routeData = await routeRes.json();
-
-    routeCoords = routeData.features[0].geometry.coordinates;
-
-    if (routeLine) {
-    map.removeLayer(routeLine);
+    clearTimeout(t);
+    const d=await r.json();
+    return d.features?d:null;
+  }catch(e){clearTimeout(t);console.warn(`Route(${type}) failed:`,e.message);return null;}
 }
 
-    routeLine = L.geoJSON(routeData,{
-        style:{color:"red",weight:6}
+// ── FIND ROUTES ──
+async function findRoutes(){
+  const sT=document.getElementById('startInput').value.trim();
+  const eT=document.getElementById('endInput').value.trim();
+  if(!sT||!eT){toast('Enter both locations');return;}
+
+  document.getElementById('findRoutesBtn').disabled=true;
+  showLoading('Locating places...','Geocoding start & destination');
+
+  try{
+    // FIX 1: Geocode in parallel
+    const [sF,eF]=await Promise.all([geocode(sT),geocode(eT)]);
+    if(!sF){toast('Start location not found');return;}
+    if(!eF){toast('Destination not found');return;}
+    geocodedStart=sF; geocodedEnd=eF;
+    const sC=sF.geometry.coordinates, eC=eF.geometry.coordinates;
+
+    showLoading('Fetching 3 routes...','Fastest · Balanced · Easiest — simultaneously');
+
+    // PHASE 2: Check route memory
+    const sC_tmp = sF.geometry.coordinates;
+    const eC_tmp = eF.geometry.coordinates;
+    const memoryCheck = checkRouteMemory(sC_tmp, eC_tmp); // runs in background
+
+    // FIX 1: All 3 routes + profile in parallel
+    const [profile,fastG,easyG,balG]=await Promise.all([
+      fetch('/driver_profile').then(r=>{ if(!r.ok) return null; const ct=r.headers.get('content-type')||''; return ct.includes('json')?r.json():null; }).catch(()=>null),
+      fetchRoute(sC,eC,'fastest'),
+      fetchRoute(sC,eC,'easiest'),
+      fetchRoute(sC,eC,'balanced'),
+    ]);
+
+    if(profile){driverProfile=profile;updateProfileChip(profile);}
+
+    buildRouteCards([
+      {id:'fastest', label:'Fastest Route', icon:'⚡', geojson:fastG},
+      {id:'easiest', label:'Easiest Route', icon:'🟢', geojson:easyG},
+      {id:'balanced',label:'Balanced Route',icon:'⚖️', geojson:balG},
+    ], sC, eC);
+
+    // PHASE 2: Show route memory if known route
+    const memory = await memoryCheck;
+    if (memory?.known) showRouteMemoryBanner(memory);
+
+  }catch(e){console.error(e);toast('Error: '+e.message);}
+  finally{hideLoading();document.getElementById('findRoutesBtn').disabled=false;}
+}
+
+// ── BUILD ROUTE CARDS ──
+function buildRouteCards(defs,sC,eC){
+  routeDataMap={};
+  const container=document.getElementById('routeCards');
+  container.innerHTML='';
+
+  const scored=defs
+    .filter(r=>r.geojson?.features)
+    .map(r=>({...r,suitability:scoreRouteForDriver(r.id,driverProfile),reason:explainRoute(r.id,driverProfile)}))
+    .sort((a,b)=>b.suitability.score-a.suitability.score);
+
+  if(scored.length) scored[0].recommended=true;
+
+  scored.forEach(r=>{
+    routeDataMap[r.id]=r;
+    const feat=r.geojson.features[0], s=feat.properties.summary;
+    // FIX 3: Real distance/time per route
+    const km=(s.distance/1000).toFixed(1), mins=Math.round(s.duration/60);
+    const sc=r.suitability.label==='Best for you'?'suit-best':r.suitability.label==='Good match'?'suit-good':'suit-low';
+    const card=document.createElement('div');
+    card.className='route-card'+(r.recommended?' recommended-card':'');
+    card.id='card-'+r.id;
+    card.innerHTML=`
+      <div class="route-card-accent"></div>
+      <div class="route-card-body">
+        <div class="route-card-top">
+          <div class="route-label">${r.icon} ${r.label} ${r.recommended?'<span class="rec-badge">✓ Rec</span>':''}</div>
+          <span class="suit-badge ${sc}">${r.suitability.label}</span>
+        </div>
+        <div class="route-stats">📏 ${km} km · ⏱ ${mins} min</div>
+        <div class="route-reason">${r.reason}</div>
+      </div>
+      <button class="select-btn" onclick="selectRoute('${r.id}')">Select</button>`;
+    container.appendChild(card);
+  });
+
+  if(!scored.length){container.innerHTML='<div style="color:var(--mu);padding:12px;font-size:13px">No routes found. Try different locations.</div>';return;}
+
+  // FIX 4: Preview top route but don't set followUser
+  previewRoute(scored[0].geojson,sC,eC);
+  document.getElementById('routeSheet').classList.add('open');
+  document.getElementById('sheetSub').textContent=
+    driverProfile?.skill_level==='Beginner'?'Easier routes recommended for your skill level':
+    driverProfile?.skill_level==='Expert'?'Fastest route suits your profile':'Balanced routes recommended for you';
+}
+
+// FIX 4: Preview without GPS follow
+function previewRoute(geojson,sC,eC){
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.geoJSON(geojson,{style:{color:'#3b82f6',weight:5,opacity:0.75,lineCap:'round',dashArray:'8,4'}}).addTo(map);
+  map.fitBounds(routeLine.getBounds(),{padding:[60,60],maxZoom:14});
+  if(window._sM) map.removeLayer(window._sM);
+  if(window._eM) map.removeLayer(window._eM);
+  window._sM=L.marker([sC[1],sC[0]]).addTo(map).bindPopup('🟢 Start');
+  window._eM=L.marker([eC[1],eC[0]]).addTo(map).bindPopup('🔴 Destination');
+  const s=geojson.features[0].properties.summary;
+  document.getElementById('routeInfoBar').textContent=`📏 ${(s.distance/1000).toFixed(1)} km · ⏱ ${Math.round(s.duration/60)} min`;
+}
+
+// ── SELECT ROUTE ──
+function selectRoute(id){
+  selectedRouteId=id; selectedRouteData=routeDataMap[id];
+  document.querySelectorAll('.route-card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('card-'+id)?.classList.add('selected');
+  const sC=geocodedStart.geometry.coordinates, eC=geocodedEnd.geometry.coordinates;
+  previewRoute(selectedRouteData.geojson,sC,eC);
+  const btn=document.getElementById('startNavBtn');
+  btn.textContent=`🚀 Start ${selectedRouteData.label}`;
+  btn.disabled=false;
+}
+
+// ── START NAV ──
+function startSelectedRoute(){
+  if(!selectedRouteData) return;
+  document.getElementById('routeSheet').classList.remove('open');
+  const geojson=selectedRouteData.geojson, feat=geojson.features[0];
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.geoJSON(geojson,{style:{color:'#3b82f6',weight:6,opacity:0.9,lineCap:'round',lineJoin:'round'}}).addTo(map);
+  map.fitBounds(routeLine.getBounds(),{padding:[60,60],maxZoom:14});
+  routeCoords=feat.geometry.coordinates;
+  routeInstructions=[];
+  (feat.properties.segments||[]).forEach(s=>(s.steps||[]).forEach(st=>routeInstructions.push(st)));
+  currentInstIdx=0;
+
+  navigationStarted=true;
+  followUser=false;
+  setTimeout(()=>followUser=true, 3000); // delay follow so fitBounds settles
+
+  tripStartTime=Date.now();
+  deviationCount=stopCount=confusionCount=rerouteCount=totalDistKm=0;
+  lastSave=Date.now();
+
+  // ── PHASE 2: Cache route for offline, load danger zones ──
+  cacheCurrentRoute();
+  loadDangerZones();
+  window._warnedZones = new Set();
+  predictTurnDifficulties();
+
+  // Show heatmap button during navigation
+  document.getElementById('heatmapBtn').style.display = 'block';
+
+  // ── INIT NAVIGATION ENGINE ──
+  closestRouteIdx  = 0;
+  remainingCoords  = [...routeCoords];
+  lastSpokenInstIdx = -1;
+  currentInstIdx   = 0;
+  routeTotalDistKm = calcRouteTotalDist();
+  remainingDistKm  = routeTotalDistKm;
+
+  // Show progress bar
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('progressFill').style.width  = '0%';
+
+  // Initial route draw as remaining (will split as user moves)
+  splitRoute(0);
+
+  document.getElementById('endNavBtn').style.display='block';
+  document.getElementById('topMenu').style.display='none';
+  document.getElementById('statusRouteWrap').style.display='';
+  document.getElementById('statusRoute').textContent=selectedRouteData.label;
+  document.getElementById('scoreCard').classList.add('visible');
+  document.getElementById('etaBar').classList.add('show');
+
+  if(window.innerWidth<=480&&!panelCollapsed) togglePanel();
+
+  adaptiveSpeak(
+    `Navigation started on ${selectedRouteData.label}. Drive safely and follow all instructions carefully.`,
+    `Starting ${selectedRouteData.label}.`,
+    'Navigation started.'
+  );
+  if(routeInstructions.length) setTimeout(()=>giveInstruction(0),3000);
+  toast(`🚀 ${selectedRouteData.label} started`);
+}
+
+// ── VOICE INSTRUCTION ──
+function giveInstruction(idx){
+  if(!navigationStarted||idx>=routeInstructions.length) return;
+  const step=routeInstructions[idx]; currentInstIdx=idx;
+  const skill=driverProfile?.skill_level||'Beginner';
+  let msg=step.instruction;
+  if(skill==='Beginner'&&step.distance){
+    const d=step.distance<1000?`in ${Math.round(step.distance)} meters`:`in ${(step.distance/1000).toFixed(1)} km`;
+    msg=`${step.instruction} ${d}`;
+  }
+  speak(msg);
+  const l=msg.toLowerCase();
+  if(l.includes('right')) showArrow('right',step.instruction);
+  else if(l.includes('left')) showArrow('left',step.instruction);
+  else if(l.includes('straight')) showArrow('straight',step.instruction);
+}
+
+// ════════════════════════════════════════════
+//  GPS WATCH
+// ════════════════════════════════════════════
+navigator.geolocation.watchPosition(onGPS, onGPSErr,
+  {enableHighAccuracy:true, maximumAge:3000, timeout:15000});
+
+// Smooth location average (reduces GPS jitter)
+function smoothLoc(lat, lon) {
+  lastPositions.push([lat, lon]);
+  if (lastPositions.length > 4) lastPositions.shift();
+  return [
+    lastPositions.reduce((a,b) => a+b[0], 0) / lastPositions.length,
+    lastPositions.reduce((a,b) => a+b[1], 0) / lastPositions.length
+  ];
+}
+
+// Haversine distance in KM
+function calcDist(lat1, lon1, lat2, lon2) {
+  const R=6371, dL=(lat2-lat1)*Math.PI/180, dO=(lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dL/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Bearing between two points (degrees, 0=North)
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const dL = (lon2-lon1)*Math.PI/180;
+  const y  = Math.sin(dL)*Math.cos(lat2*Math.PI/180);
+  const x  = Math.cos(lat1*Math.PI/180)*Math.sin(lat2*Math.PI/180)
+            - Math.sin(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.cos(dL);
+  return (Math.atan2(y,x)*180/Math.PI + 360) % 360;
+}
+
+// ── FIND CLOSEST POINT ON ROUTE ──
+// Returns index of routeCoords closest to user
+function findClosestRoutePoint(lat, lon) {
+  let minDist = Infinity, minIdx = 0;
+  // Only search from current position forward (not whole route)
+  const searchFrom = Math.max(0, closestRouteIdx - 5);
+  const searchTo   = Math.min(routeCoords.length, closestRouteIdx + 60);
+  for (let i = searchFrom; i < searchTo; i++) {
+    const d = calcDist(lat, lon, routeCoords[i][1], routeCoords[i][0]);
+    if (d < minDist) { minDist = d; minIdx = i; }
+  }
+  return { idx: minIdx, dist: minDist };
+}
+
+// ── SPLIT ROUTE into completed (grey) + remaining (blue) ──
+function splitRoute(fromIdx) {
+  if (!map || !routeCoords.length) return;
+
+  const completedPts = routeCoords.slice(0, fromIdx+1).map(c => [c[1], c[0]]);
+  const remainingPts = routeCoords.slice(fromIdx).map(c => [c[1], c[0]]);
+
+  // Remove old lines
+  if (completedLine) { map.removeLayer(completedLine); completedLine = null; }
+  if (remainingLine) { map.removeLayer(remainingLine); remainingLine = null; }
+  if (routeLine)     { map.removeLayer(routeLine);     routeLine     = null; }
+
+  // Draw completed (grey, thin)
+  if (completedPts.length >= 2) {
+    completedLine = L.polyline(completedPts, {
+      color:'#374151', weight:4, opacity:0.5, lineCap:'round'
     }).addTo(map);
+  }
 
-    map.fitBounds(routeLine.getBounds(), {
-    padding: [50, 50],   // adds space around route
-    maxZoom: 13          // 🚀 prevents too much zoom
-});
-    navigationStarted = true;
-    speak("Rerouting...");
-    rerouting = false;
+  // Draw remaining (blue, solid)
+  if (remainingPts.length >= 2) {
+    remainingLine = L.polyline(remainingPts, {
+      color:'#3b82f6', weight:6, opacity:0.9, lineCap:'round', lineJoin:'round'
+    }).addTo(map);
+  }
+
+  // Accurate remaining distance
+  remainingDistKm = 0;
+  for (let i = fromIdx; i < routeCoords.length-1; i++) {
+    remainingDistKm += calcDist(routeCoords[i][1], routeCoords[i][0], routeCoords[i+1][1], routeCoords[i+1][0]);
+  }
+
+  // Progress bar
+  if (routeTotalDistKm > 0) {
+    const pct = Math.min(100, ((routeTotalDistKm - remainingDistKm) / routeTotalDistKm) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+  }
 }
 
-/* 💾 SAVE (NO BREAKING DB) */
-function saveBehavior(lat,lon){
+// ── CALCULATE TOTAL ROUTE DISTANCE ──
+function calcRouteTotalDist() {
+  let total = 0;
+  for (let i = 0; i < routeCoords.length-1; i++) {
+    total += calcDist(routeCoords[i][1], routeCoords[i][0], routeCoords[i+1][1], routeCoords[i+1][0]);
+  }
+  return total;
+}
 
-    fetch('/save_behavior',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-        deviations: deviationCount,
-        stops: stopCount,
-        confusion: confusionCount,
-        speed: Math.random()*80,   // NEW
-        braking: Math.random()*5,  // NEW
-        lat: lat,
-        lon: lon
-})
-        })
+// ── ROTATING USER MARKER ──
+function createUserMarker(lat, lon) {
+  const el = document.createElement('div');
+  el.className = 'arrow-icon';
+  el.id = 'userArrowEl';
+  const icon = L.divIcon({ className:'user-arrow-marker', html:el, iconSize:[36,36], iconAnchor:[18,18] });
+  return L.marker([lat, lon], { icon, zIndexOffset:1000 }).addTo(map);
+}
+
+function rotateUserMarker(heading) {
+  const el = document.getElementById('userArrowEl');
+  if (el) el.style.transform = `rotate(${heading - 45}deg)`;
+}
+
+// ── OFF ROUTE CHECK ──
+function isOffRoute(lat, lon) {
+  const { dist } = findClosestRoutePoint(lat, lon);
+  return dist > 0.15; // 150m
+}
+
+// ════════════════════════════════════════════
+//  MAIN GPS HANDLER
+// ════════════════════════════════════════════
+function onGPS(pos) {
+  if (typeof L === 'undefined' || !map) return;
+
+  const rawLat = pos.coords.latitude;
+  const rawLon = pos.coords.longitude;
+  const [lat, lon] = smoothLoc(rawLat, rawLon);
+
+  document.getElementById('statusGps').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+  // ── UPDATE HEADING ──
+  if (lastLat !== null) {
+    const bearing = calcBearing(lastLat, lastLon, lat, lon);
+    // Smooth heading (weighted average)
+    userHeading = userHeading * 0.7 + bearing * 0.3;
+  }
+
+  // ── UPDATE / CREATE USER MARKER ──
+  if (userMarker) {
+    userMarker.setLatLng([lat, lon]);
+    rotateUserMarker(userHeading);
+  } else {
+    userMarker = createUserMarker(lat, lon);
+  }
+
+  // ── CAMERA FOLLOW (only during navigation) ──
+  if (navigationStarted && followUser) {
+    // Smooth flyTo — stays centered on user, slight ahead bias in direction of travel
+    const aheadLat = lat + Math.cos(userHeading * Math.PI/180) * 0.002;
+    const aheadLon = lon + Math.sin(userHeading * Math.PI/180) * 0.002;
+    map.panTo([aheadLat, aheadLon], { animate:true, duration:0.5 });
+  }
+
+  // ── SPEED ──
+  const now = Date.now(), td = (now - lastTime) / 1000;
+  let speed = 0;
+  if (lastLat !== null && td > 0.5) {
+    const d = calcDist(lat, lon, lastLat, lastLon);
+    speed = (d / td) * 3600;
+    if (navigationStarted) totalDistKm += d;
+  }
+  document.getElementById('statusSpeed').textContent = `${Math.round(speed)} km/h`;
+
+  // ── NAVIGATION ENGINE ──
+  if (navigationStarted) {
+    runNavigationEngine(lat, lon, speed, now);
+  }
+
+  lastSpeed = speed; lastTime = now; lastLat = lat; lastLon = lon;
+}
+
+function onGPSErr(e) {
+  const msgs = {1:'GPS blocked — allow location in browser', 2:'GPS signal unavailable', 3:'GPS timed out'};
+  document.getElementById('statusGps').textContent = msgs[e.code] || 'GPS unavailable';
+  if (e.code===1) toast('📍 Allow location access in browser settings', 5000);
+}
+
+// ════════════════════════════════════════════
+//  NAVIGATION ENGINE — replaces navUpdate
+// ════════════════════════════════════════════
+function runNavigationEngine(lat, lon, speed, now) {
+
+  // ── 1. FIND POSITION ON ROUTE ──
+  const { idx, dist } = findClosestRoutePoint(lat, lon);
+
+  // Only move forward (never go backwards on route)
+  if (idx > closestRouteIdx) {
+    closestRouteIdx = idx;
+    // Split route: grey done, blue remaining
+    splitRoute(closestRouteIdx);
+  }
+
+  // ── 2. CHECK NEXT INSTRUCTION ──
+  checkAndSpeakInstruction(lat, lon);
+
+  // ── 3. ACCURATE ETA ──
+  updateAccurateETA(speed);
+
+  // ── 4. STOP DETECTION ──
+  if (speed < 2) {
+    stopCount++; slowTimer++;
+    if (slowTimer === 4) {
+      confusionCount++;
+      sendConfEvent('sudden_stop', lat, lon);
+    }
+  } else {
+    slowTimer = 0;
+  }
+
+  // ── 5. HARSH BRAKE ──
+  if (lastSpeed - speed > 25) confusionCount++;
+
+  // ── 6. OFF ROUTE ──
+  if (dist > 0.15) {
+    deviationCount++; offRouteTimer++;
+
+    if (offRouteTimer === 2) {
+      showConfusion('⚠️ You might miss this turn!');
+      speak(driverProfile?.skill_level==='Beginner'
+        ? 'Slow down, you might miss the turn.' : 'Watch the turn ahead.');
+      sendConfEvent('predictive_miss', lat, lon);
     }
 
+    if (offRouteTimer > 5 && !rerouting) {
+      rerouting = true; rerouteCount++;
+      const msg = driverProfile?.weakness && driverProfile.weakness !== 'None detected'
+        ? `Rerouting — ${driverProfile.weakness} detected.` : 'Off route. Rerouting now.';
+      showConfusion('🔄 ' + msg);
+      speak(msg);
+      sendConfEvent(rerouteCount > 2 ? 'repeated_reroute' : 'late_turn', lat, lon);
+      rerouteNav(lat, lon);
+    }
+  } else {
+    offRouteTimer = 0;
+  }
 
-/* 🔊 VOICE */
-function speak(text){
-    let msg = new SpeechSynthesisUtterance(text);
-    speechSynthesis.speak(msg);
+  // ── 7. DANGER ZONE CHECK ──
+  checkDangerZones(lat, lon);
+
+  // ── 8. SAVE BEHAVIOR every 30s ──
+  if (now - lastSave > 30000) { saveBehavior(lat, lon); lastSave = now; }
+
+  // ── 9. REFRESH TURN DIFFICULTY every 2 minutes ──
+  if (!window._lastDiffCheck || now - window._lastDiffCheck > 120000) {
+    window._lastDiffCheck = now;
+    predictTurnDifficulties();
+  }
 }
 
-/* 🔧 KEEP */
-function findPlace(type){
-    alert("Showing nearby "+type);
+// ════════════════════════════════════════════
+//  TURN-BY-TURN INSTRUCTION ENGINE
+// ════════════════════════════════════════════
+function checkAndSpeakInstruction(lat, lon) {
+  if (!routeInstructions.length) return;
+
+  // Find which instruction we're approaching
+  for (let i = currentInstIdx; i < routeInstructions.length; i++) {
+    const step = routeInstructions[i];
+    if (!step.way_points) continue;
+
+    const wpIdx = step.way_points[0];
+    if (wpIdx >= routeCoords.length) continue;
+
+    // Distance to this waypoint
+    const wLat = routeCoords[wpIdx][1];
+    const wLon = routeCoords[wpIdx][0];
+    const distToWP = calcDist(lat, lon, wLat, wLon);
+
+    // Update instruction banner always
+    if (i === currentInstIdx) {
+      updateInstructionBanner(step, distToWP);
+    }
+
+    // Early warning for beginners (300m)
+    if (distToWP < 0.3 && distToWP > 0.15 && i === currentInstIdx) {
+      const skill = driverProfile?.skill_level || 'Beginner';
+      const isComplex = /right|left/i.test(step.instruction);
+      if (isComplex && (skill === 'Beginner' || driverProfile?.needs_early_warnings)) {
+        if (lastSpokenInstIdx !== i * 10) { // early warning slot
+          lastSpokenInstIdx = i * 10;
+          speak(`In 300 meters, ${step.instruction}`);
+          sendConfEvent('approaching_complex', lat, lon);
+        }
+      }
+    }
+
+    // Speak at 80m
+    if (distToWP < 0.08 && lastSpokenInstIdx !== i) {
+      lastSpokenInstIdx = i;
+      giveInstruction(i);
+    }
+
+    // Move to next instruction once we pass the waypoint (within 30m)
+    if (distToWP < 0.03 && i === currentInstIdx) {
+      currentInstIdx = Math.min(i + 1, routeInstructions.length - 1);
+    }
+
+    // Don't look more than 2 steps ahead
+    if (i >= currentInstIdx + 1) break;
+  }
 }
+
+// ── UPDATE INSTRUCTION BANNER ──
+const arrowMap2 = {
+  right:'➡️', left:'⬅️', straight:'⬆️', 'slight right':'↗️',
+  'slight left':'↖️', 'sharp right':'↪️', 'sharp left':'↩️', 'u-turn':'🔄',
+  arrive:'🏁', depart:'🚦', roundabout:'🔄'
+};
+
+function updateInstructionBanner(step, distKm) {
+  const banner = document.getElementById('instructionBanner');
+  const lower  = step.instruction.toLowerCase();
+
+  let arrowKey = Object.keys(arrowMap2).find(k => lower.includes(k)) || 'straight';
+  document.getElementById('instrArrow').textContent = arrowMap2[arrowKey];
+  document.getElementById('instrText').textContent  = step.instruction;
+
+  const distText = distKm < 0.1
+    ? `${Math.round(distKm * 1000)} m`
+    : `${distKm.toFixed(1)} km`;
+  document.getElementById('instrDist').textContent = `In ${distText}`;
+
+  banner.classList.add('show');
+
+  // PHASE 2: Lane arrows + turn difficulty
+  updateLaneArrows(step.instruction);
+  showTurnDifficulty(currentInstIdx);
+}
+
+// ── GIVE VOICE INSTRUCTION ──
+
+// ── ACCURATE ETA ──
+function updateAccurateETA(speed) {
+  const spd      = speed > 5 ? speed : 30; // default 30 km/h if stationary
+  const minsLeft = remainingDistKm > 0
+    ? Math.round((remainingDistKm / spd) * 60)
+    : 0;
+
+  document.getElementById('etaTime').textContent = minsLeft;
+  document.getElementById('etaDist').textContent = remainingDistKm.toFixed(1);
+
+  const sc = Math.max(0, 100 - (deviationCount*5 + stopCount*3 + confusionCount*4));
+  document.getElementById('etaScore').textContent = sc;
+}
+
+
+async function sendConfEvent(type,lat,lon){
+  try{
+    const r=await fetch('/confusion_event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:type,lat,lon,junction_complexity:1})});
+    const d=await r.json();
+    if(d.voice_message)speak(d.voice_message);
+    if(d.show_arrows)showArrow('right',d.voice_message);
+    if(d.action==='switch_to_easy'&&!rerouting)switchToEasiest();
+    if(d.explainer)showConfusion(d.explainer);
+  }catch(e){console.warn(e);}
+}
+
+async function rerouteNav(lat,lon){
+  if(!geocodedEnd)return;
+  const eC=geocodedEnd.geometry.coordinates,type=rerouteCount>2?'easiest':'balanced';
+  try{
+    const g=await fetchRoute([lon,lat],eC,type);
+    if(!g?.features)return;
+    if(routeLine)map.removeLayer(routeLine);
+    routeLine=L.geoJSON(g,{style:{color:'#ef4444',weight:6,opacity:0.85,lineCap:'round'}}).addTo(map);
+    routeCoords=g.features[0].geometry.coordinates;
+    routeInstructions=[];
+    (g.features[0].properties.segments||[]).forEach(s=>(s.steps||[]).forEach(st=>routeInstructions.push(st)));
+    // Reset engine for new route
+    closestRouteIdx=0; lastSpokenInstIdx=-1; currentInstIdx=0;
+    routeTotalDistKm=calcRouteTotalDist(); remainingDistKm=routeTotalDistKm;
+    splitRoute(0);
+    adaptiveSpeak('Route updated. Follow the new path carefully.','Rerouted. Follow new path.','Rerouted.');
+  }catch(e){console.error(e);}finally{rerouting=false;}
+}
+
+async function switchToEasiest(){
+  if(!geocodedEnd||!lastLat)return;
+  const g=await fetchRoute([lastLon,lastLat],geocodedEnd.geometry.coordinates,'easiest');
+  if(!g?.features)return;
+  if(routeLine)map.removeLayer(routeLine);
+  routeLine=L.geoJSON(g,{style:{color:'#10b981',weight:6,opacity:0.9,lineCap:'round'}}).addTo(map);
+  routeCoords=g.features[0].geometry.coordinates;
+  document.getElementById('statusRoute').textContent='Easiest Route';
+  toast('✅ Switched to easiest route');
+}
+
+function updateETA(lat,lon){
+  if(!geocodedEnd)return;
+  const e=geocodedEnd.geometry.coordinates,d=calcDist(lat,lon,e[1],e[0]);
+  const spd=lastSpeed>5?lastSpeed:30;
+  document.getElementById('etaTime').textContent=Math.round((d/spd)*60);
+  document.getElementById('etaDist').textContent=d.toFixed(1);
+  document.getElementById('etaScore').textContent=Math.max(0,100-(deviationCount*5+stopCount*3+confusionCount*4));
+}
+
+function saveBehavior(lat,lon){
+  fetch('/save_behavior',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviations:deviationCount,stops:stopCount,confusion:confusionCount,lat,lon})})
+  .then(r=>r.json()).then(d=>{
+    if(d.score===undefined)return;
+    const el=document.getElementById('scoreVal');
+    el.textContent=d.score;el.className='score-val '+(d.score>=70?'safe':d.score>=50?'avg':'risk');
+    document.getElementById('driverTypeLabel').textContent=d.driver_type||'';
+    document.getElementById('focusLevelLabel').textContent=d.focus_level||'--';
+    const fp=d.focus_score??50,fill=document.getElementById('focusBarFill');
+    fill.style.width=fp+'%';fill.style.background=fp>=75?'var(--grn)':fp>=50?'var(--org)':'var(--red)';
+  }).catch(console.error);
+}
+
+async function endNavigation(){
+  if(!navigationStarted)return;
+  navigationStarted=false;followUser=false;
+  document.getElementById('endNavBtn').style.display='none';
+  document.getElementById('topMenu').style.display='flex';
+  document.getElementById('etaBar').classList.remove('show');
+  document.getElementById('statusRouteWrap').style.display='none';
+  const mins=Math.round((Date.now()-tripStartTime)/60000);
+  try{
+    const r=await fetch('/ride_summary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviations:deviationCount,stops:stopCount,confusion:confusionCount,duration_minutes:mins,distance_km:totalDistKm.toFixed(2),route_type:selectedRouteId||'unknown'})});
+    showSummary(await r.json());
+  }catch(e){toast('Could not save summary');}
+  // PHASE 2: Save route memory + hide heatmap btn + clear danger zones
+  saveRouteMemory();
+  document.getElementById('heatmapBtn').style.display = 'none';
+  document.getElementById('heatmapBtn').classList.remove('active');
+  document.getElementById('heatmapFab').classList.remove('active');
+  clearHeatmap();
+  heatmapActive = false;
+
+  loadProfile();
+}
+
+function showSummary(s){
+  const c=s.score>=70?'var(--grn)':s.score>=50?'var(--org)':'var(--red)';
+  document.getElementById('summaryGrid').innerHTML=`
+    <div class="summary-stat"><div class="summary-stat-val" style="color:${c}">${s.score}</div><div class="summary-stat-label">Score</div></div>
+    <div class="summary-stat"><div class="summary-stat-val" style="color:var(--acc)">${s.distance_km}</div><div class="summary-stat-label">KM</div></div>
+    <div class="summary-stat"><div class="summary-stat-val">${s.duration_minutes}</div><div class="summary-stat-label">Mins</div></div>
+    <div class="summary-stat"><div class="summary-stat-val" style="color:var(--red)">${s.deviations}</div><div class="summary-stat-label">Deviations</div></div>
+    <div class="summary-stat"><div class="summary-stat-val" style="color:var(--org)">${s.confusion}</div><div class="summary-stat-label">Confusion</div></div>
+    <div class="summary-stat"><div class="summary-stat-val">${s.focus_level}</div><div class="summary-stat-label">Focus</div></div>`;
+  document.getElementById('suggestionsList').innerHTML=(s.suggestions||[]).map(g=>`<div class="suggestion-item">💡 ${g}</div>`).join('');
+  document.getElementById('summarySheet').classList.add('open');
+  setTimeout(()=>speak(`Trip complete. Score ${s.score}. ${s.suggestions?.[0]||''}`),500);
+}
+
+function closeSummary(){
+  document.getElementById('summarySheet').classList.remove('open');
+  deviationCount=stopCount=confusionCount=rerouteCount=totalDistKm=0;
+  closestRouteIdx=0; remainingDistKm=0; routeTotalDistKm=0; lastSpokenInstIdx=-1;
+  selectedRouteId=null; selectedRouteData=null; routeCoords=[]; routeInstructions=[];
+
+  if(routeLine)     { map.removeLayer(routeLine);     routeLine=null; }
+  if(completedLine) { map.removeLayer(completedLine); completedLine=null; }
+  if(remainingLine) { map.removeLayer(remainingLine); remainingLine=null; }
+
+  document.getElementById('progressBar').style.display='none';
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('instructionBanner').classList.remove('show');
+  document.getElementById('lanePanel').classList.remove('show');
+  document.getElementById('routeMemoryBanner').classList.remove('show');
+  document.getElementById('turnDiffBadge').style.display='none';
+  dangerZonesLoaded = false; dangerZones = [];
+  dangerZoneMarkers.forEach(m => map.removeLayer(m)); dangerZoneMarkers = [];
+  window._warnedZones = new Set(); turnDifficultyCache = [];
+  document.getElementById('routeInfoBar').textContent='Enter locations to get started';
+  document.getElementById('statusRoute').textContent='--';
+  document.getElementById('scoreCard').classList.remove('visible');
+}
+
+async function findNearby(type){
+  if(!userMarker){toast('Enable GPS first');return;}
+  const ll=userMarker.getLatLng();
+  nearbyMarkers.forEach(m=>map.removeLayer(m));nearbyMarkers=[];
+  const t={fuel:{e:'⛽',k:'amenity=fuel'},hospital:{e:'🏥',k:'amenity=hospital'},atm:{e:'🏧',k:'amenity=atm'}};
+  const cfg=t[type];
+  try{
+    const r=await fetch(`https://overpass-api.de/api/interpreter?data=[out:json];node[${cfg.k}](around:2000,${ll.lat},${ll.lng});out 5;`);
+    const d=await r.json();
+    if(!d.elements.length){toast('None found nearby');return;}
+    d.elements.forEach(el=>{const m=L.marker([el.lat,el.lon]).addTo(map).bindPopup(`${cfg.e} ${el.tags.name||type}`);nearbyMarkers.push(m);});
+    toast(`${cfg.e} Found ${d.elements.length} nearby`);
+  }catch(e){toast('Search failed');}
+}
+
+function locateMe(){if(userMarker)map.setView(userMarker.getLatLng(),15);}
+// ════════════════════════════════════════════
+//  PHASE 2: OFFLINE MODE
+// ════════════════════════════════════════════
+let isOffline = false;
+let cachedRoute = null; // {routeCoords, instructions, endCoord}
+
+window.addEventListener('offline', () => {
+  isOffline = true;
+  document.getElementById('offlineBanner').style.display = 'block';
+  toast('📡 Offline — using cached route if available', 5000);
+  if (cachedRoute) {
+    toast('✅ Cached route loaded — navigation continues', 4000);
+  }
+});
+
+window.addEventListener('online', () => {
+  isOffline = false;
+  document.getElementById('offlineBanner').style.display = 'none';
+  toast('✅ Back online');
+  // Refresh route if we were using cache
+  if (navigationStarted && cachedRoute) rerouteNav(lastLat, lastLon);
+});
+
+// Save route to cache when navigation starts
+function cacheCurrentRoute() {
+  if (!routeCoords.length || !geocodedEnd) return;
+  cachedRoute = {
+    routeCoords: [...routeCoords],
+    instructions: [...routeInstructions],
+    endCoord: geocodedEnd.geometry.coordinates
+  };
+  // Also save to localStorage for persistence across page reloads
+  try {
+    localStorage.setItem('driveiq_cached_route', JSON.stringify({
+      routeCoords: routeCoords.slice(0, 200), // limit size
+      endCoord: geocodedEnd.geometry.coordinates,
+      routeType: selectedRouteId,
+      savedAt: Date.now()
+    }));
+  } catch(e) { console.warn('Cache save failed:', e); }
+}
+
+// Load cached route on startup
+function loadCachedRoute() {
+  try {
+    const raw = localStorage.getItem('driveiq_cached_route');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    // Only use cache if saved within last 2 hours
+    if (Date.now() - data.savedAt > 7200000) { localStorage.removeItem('driveiq_cached_route'); return; }
+    cachedRoute = data;
+    console.log('Cached route available from', new Date(data.savedAt).toLocaleTimeString());
+  } catch(e) {}
+}
+loadCachedRoute();
+
+// Offline fetchRoute is handled inside the main fetchRoute via isOffline flag
+
+// ════════════════════════════════════════════
+//  PHASE 2: HEATMAP OF MISTAKES
+// ════════════════════════════════════════════
+let heatmapActive = false;
+let heatmapCircles = [];
+let dangerZoneMarkers = [];
+let dangerZonesLoaded = false;
+let dangerZones = [];
+
+async function toggleHeatmap() {
+  heatmapActive = !heatmapActive;
+
+  const btn  = document.getElementById('heatmapBtn');
+  const fab  = document.getElementById('heatmapFab');
+
+  if (heatmapActive) {
+    btn?.classList.add('active');
+    fab?.classList.add('active');
+    await drawHeatmap();
+    toast('🔥 Heatmap ON — red = mistake zones');
+  } else {
+    btn?.classList.remove('active');
+    fab?.classList.remove('active');
+    clearHeatmap();
+    toast('Heatmap OFF');
+  }
+}
+
+async function drawHeatmap() {
+  clearHeatmap();
+  try {
+    const res  = await fetch('/heatmap_data');
+    const data = await res.json();
+    if (!data.length) { toast('No mistake data yet — drive more to build heatmap'); return; }
+
+    const maxIntensity = Math.max(...data.map(d => d.intensity), 1);
+
+    data.forEach(pt => {
+      const ratio   = pt.intensity / maxIntensity;
+      const radius  = 30 + ratio * 120; // 30–150m radius
+      const color   = ratio > 0.7 ? '#ef4444' : ratio > 0.4 ? '#f59e0b' : '#fbbf24';
+      const opacity = 0.15 + ratio * 0.35;
+
+      const circle = L.circle([pt.lat, pt.lon], {
+        radius, color, fillColor: color,
+        fillOpacity: opacity, weight: 0,
+        className: 'heatmap-circle'
+      }).addTo(map).bindPopup(
+        `<b>⚠️ Mistake Zone</b><br>Incidents: ${pt.intensity}<br>Severity: ${ratio > 0.7 ? '🔴 High' : ratio > 0.4 ? '🟡 Medium' : '🟢 Low'}`
+      );
+      heatmapCircles.push(circle);
+    });
+  } catch(e) { toast('Heatmap load failed'); console.error(e); }
+}
+
+function clearHeatmap() {
+  heatmapCircles.forEach(c => map.removeLayer(c));
+  heatmapCircles = [];
+}
+
+// ── DANGER ZONES (load once, check during nav) ──
+async function loadDangerZones() {
+  if (dangerZonesLoaded) return;
+  try {
+    const res = await fetch('/danger_zones');
+    dangerZones = await res.json();
+    dangerZonesLoaded = true;
+
+    // Draw subtle danger zone markers
+    dangerZones.forEach(z => {
+      const color = z.severity==='high' ? '#ef4444' : z.severity==='medium' ? '#f59e0b' : '#fbbf24';
+      const m = L.circleMarker([z.lat, z.lon], {
+        radius: z.severity==='high' ? 10 : 7,
+        color, fillColor: color, fillOpacity: 0.2, weight: 2,
+        className: z.severity==='high' ? 'danger-zone-marker' : ''
+      }).addTo(map).bindPopup(
+        `<b>⚠️ Personal Danger Zone</b><br>Type: ${z.type}<br>Times confused here: ${z.hits}`
+      );
+      dangerZoneMarkers.push(m);
+    });
+  } catch(e) { console.warn('Danger zones load failed', e); }
+}
+
+// Check if user is approaching a danger zone (called from nav engine)
+function checkDangerZones(lat, lon) {
+  if (!dangerZones.length) return;
+  dangerZones.forEach(z => {
+    const d = calcDist(lat, lon, z.lat, z.lon);
+    if (d < 0.2 && d > 0.05) { // 50–200m away
+      const key = `${z.lat.toFixed(3)}_${z.lon.toFixed(3)}`;
+      if (!window._warnedZones) window._warnedZones = new Set();
+      if (!window._warnedZones.has(key)) {
+        window._warnedZones.add(key);
+        const msg = z.severity === 'high'
+          ? `⚠️ Danger zone ahead! You've had trouble here ${z.hits} times.`
+          : `⚠️ You've had confusion near here before. Stay alert.`;
+        showConfusion(msg);
+        speak(z.severity==='high'
+          ? `Warning! Danger zone ahead. You have struggled here ${z.hits} times before.`
+          : 'You have had confusion near this junction before. Stay alert.');
+        // Clear warning after passing
+        setTimeout(() => window._warnedZones?.delete(key), 60000);
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+//  PHASE 2: ROUTE MEMORY
+// ════════════════════════════════════════════
+async function checkRouteMemory(sCoord, eCoord) {
+  try {
+    const res  = await fetch('/route_memory_lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_lat: sCoord[1], start_lon: sCoord[0],
+        end_lat:   eCoord[1], end_lon:   eCoord[0]
+      })
+    });
+    const data = await res.json();
+    if (!data.known) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
+function showRouteMemoryBanner(memory) {
+  if (!memory?.known) return;
+  const banner = document.getElementById('routeMemoryBanner');
+  const tips   = document.getElementById('memoryTips');
+
+  let html = `<div style="font-size:12px;color:var(--mu)">You've done this route <b style="color:var(--txt)">${memory.times_done}x</b> before</div>`;
+
+  (memory.tips || []).forEach(tip => {
+    html += `<div class="memory-tip">💡 ${tip}</div>`;
+  });
+
+  if (memory.best_route_type) {
+    html += `<div class="memory-tip" style="color:var(--grn)">✅ Best route last time: <b>${memory.best_route_type}</b></div>`;
+  }
+
+  tips.innerHTML = html;
+  banner.classList.add('show');
+
+  // Auto hide after 8 seconds
+  setTimeout(() => banner.classList.remove('show'), 8000);
+
+  // Speak memory tip
+  if (memory.tips?.length) speak(memory.tips[0]);
+}
+
+// Save route memory when trip ends
+async function saveRouteMemory() {
+  if (!geocodedStart || !geocodedEnd) return;
+  const sC = geocodedStart.geometry.coordinates;
+  const eC = geocodedEnd.geometry.coordinates;
+  try {
+    await fetch('/save_route_memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_lat:  sC[1], start_lon: sC[0],
+        end_lat:    eC[1], end_lon:   eC[0],
+        route_type: selectedRouteId || 'unknown',
+        mistakes:   deviationCount,
+        confusion:  confusionCount,
+        completed:  true
+      })
+    });
+  } catch(e) { console.warn('Route memory save failed', e); }
+}
+
+// ════════════════════════════════════════════
+//  PHASE 2: TURN DIFFICULTY PREDICTION
+// ════════════════════════════════════════════
+let turnDifficultyCache = []; // predicted difficulties for upcoming turns
+
+async function predictTurnDifficulties() {
+  if (!routeInstructions.length) return;
+
+  // Send next 5 turns to backend
+  const turns = routeInstructions
+    .slice(currentInstIdx, currentInstIdx + 5)
+    .filter(s => s.way_points)
+    .map(s => {
+      const wp = s.way_points[0];
+      const coord = routeCoords[Math.min(wp, routeCoords.length-1)];
+      return {
+        instruction: s.instruction,
+        lat: coord ? coord[1] : 0,
+        lon: coord ? coord[0] : 0,
+        distance: s.distance || 0
+      };
+    });
+
+  if (!turns.length) return;
+
+  try {
+    const res  = await fetch('/turn_difficulty', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turns })
+    });
+    turnDifficultyCache = await res.json();
+  } catch(e) { console.warn('Turn difficulty prediction failed', e); }
+}
+
+function showTurnDifficulty(stepIdx) {
+  const badge = document.getElementById('turnDiffBadge');
+  if (!turnDifficultyCache.length) { badge.style.display='none'; return; }
+
+  const relIdx = stepIdx - currentInstIdx;
+  const diff   = turnDifficultyCache[Math.max(0, relIdx)];
+  if (!diff) { badge.style.display='none'; return; }
+
+  badge.textContent  = `${diff.emoji} ${diff.difficulty} turn`;
+  badge.className    = `diff-${diff.difficulty.toLowerCase()}`;
+  badge.style.display = 'inline-block';
+
+  // Warn for hard turns
+  if (diff.difficulty === 'Hard' && diff.past_confusion > 0) {
+    toast(`🔴 Hard turn ahead — you've had trouble here before`);
+  }
+}
+
+// ════════════════════════════════════════════
+//  PHASE 2: LANE ARROWS
+// ════════════════════════════════════════════
+function updateLaneArrows(instruction) {
+  const panel    = document.getElementById('lanePanel');
+  const lLeft    = document.getElementById('lane-left');
+  const lStraight= document.getElementById('lane-straight');
+  const lRight   = document.getElementById('lane-right');
+  const lower    = instruction.toLowerCase();
+
+  // Reset
+  [lLeft, lStraight, lRight].forEach(l => l.classList.remove('active'));
+
+  let show = true;
+  if (lower.includes('sharp right') || lower.includes('turn right')) {
+    lRight.classList.add('active');
+  } else if (lower.includes('sharp left') || lower.includes('turn left')) {
+    lLeft.classList.add('active');
+  } else if (lower.includes('slight right')) {
+    lRight.classList.add('active'); lStraight.classList.add('active');
+  } else if (lower.includes('slight left')) {
+    lLeft.classList.add('active'); lStraight.classList.add('active');
+  } else if (lower.includes('straight') || lower.includes('continue') || lower.includes('keep')) {
+    lStraight.classList.add('active');
+  } else if (lower.includes('u-turn')) {
+    lLeft.classList.add('active');
+  } else if (lower.includes('arrive') || lower.includes('destination')) {
+    panel.classList.remove('show'); return;
+  } else {
+    show = false;
+  }
+
+  if (show) {
+    panel.classList.add('show');
+    setTimeout(() => panel.classList.remove('show'), 5000);
+  }
+}
+
+window.addEventListener('offline',()=>toast('⚠️ No internet'));
+window.addEventListener('online', ()=>toast('✅ Back online'));
+
+// ── ROUTE SCORING ──
+function scoreRouteForDriver(id, p) {
+  if (!p) return {score:70, label:'Good match'};
+  const skill = p.skill_level;
+  const base = {
+    fastest: {Expert:95, Average:65, Beginner:40},
+    easiest: {Expert:60, Average:80, Beginner:95},
+    balanced:{Expert:75, Average:85, Beginner:70}
+  };
+  let s = base[id]?.[skill] || 70;
+  if (id==='fastest' && p.avoid_complex_turns) s -= 20;
+  if (id==='fastest' && p.prefer_simple_routes) s -= 15;
+  if (id==='easiest' && (p.avoid_complex_turns || p.prefer_simple_routes)) s += 10;
+  s = Math.max(0, Math.min(100, s));
+  return {score:s, label: s>=80 ? 'Best for you' : s>=60 ? 'Good match' : 'Not recommended'};
+}
+
+function explainRoute(id, p) {
+  if (!p) return '';
+  const skill=p.skill_level, ac=p.avoid_complex_turns, ps=p.prefer_simple_routes;
+  if (id==='fastest')  return skill==='Expert' ? 'Matches your experience level.' : ac ? 'Has complex turns you often struggle with.' : ps ? 'Has sharp turns you tend to deviate at.' : 'Standard fastest path.';
+  if (id==='easiest')  return ps ? 'Chosen because you often deviate on complex roads.' : ac ? 'Avoids complex intersections.' : skill==='Expert' ? 'May feel slow for your skill level.' : 'Fewer turns, simpler junctions.';
+  return 'Good mix of speed and simplicity for your driving style.';
+}
+
+
+// ════════════════════════════════════════════════════════
+//  PHASE 2 — FEATURE MODULES
+// ════════════════════════════════════════════════════════
+
+// ── PHASE 2 STATE ──
+let heatmapVisible  = false;
+let dangerAlertTimer= null;
+let offlineMode     = false;
+let turnDifficulties= [];
+let memoryBannerShown = false;
+
+// ════════════════════════════════════════════════════════
+//  1. OFFLINE MODE
+//     Caches route in localStorage so nav works without net
+// ════════════════════════════════════════════════════════
+const CACHE_KEY = 'driveiq_cached_route';
+
+function cacheRouteOffline(geojson, startText, endText) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      geojson, startText, endText, ts: Date.now()
+    }));
+  } catch(e) { console.warn('Cache failed:', e); }
+}
+
+function clearRouteCache() {
+  try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
+}
+
+// Offline detection
+window.addEventListener('offline', () => {
+  offlineMode = true;
+  document.getElementById('offlineBanner').classList.add('show');
+  toast('📵 Offline — using cached route if available', 5000);
+});
+
+window.addEventListener('online', () => {
+  offlineMode = false;
+  document.getElementById('offlineBanner').classList.remove('show');
+  toast('✅ Back online');
+});
+
+// ── OVERRIDE findRoutes to use cache when offline ──
+const _origFindRoutes = findRoutes;
+window.findRoutes = async function() {
+  if (offlineMode || !navigator.onLine) {
+    const cached = loadCachedRoute();
+    if (cached) {
+      toast('📵 Offline — loaded cached route');
+      geocodedStart = { geometry:{ coordinates: cached.geojson.features[0].geometry.coordinates[0] } };
+      geocodedEnd   = { geometry:{ coordinates: cached.geojson.features[0].geometry.coordinates.slice(-1)[0] } };
+      document.getElementById('startInput').value = cached.startText || 'Cached Start';
+      document.getElementById('endInput').value   = cached.endText   || 'Cached End';
+      // Build a fake route cards from cached geojson
+      buildRouteCards([
+        { id:'cached', label:'Cached Route', icon:'💾', geojson:cached.geojson }
+      ], geocodedStart.geometry.coordinates, geocodedEnd.geometry.coordinates);
+      return;
+    } else {
+      toast('📵 Offline and no cached route available');
+      return;
+    }
+  }
+  return _origFindRoutes();
+};
+
+// Cache route when navigation starts
+const _origStartSelectedRoute = startSelectedRoute;
+window.startSelectedRoute = function() {
+  // Cache the selected route for offline use
+  if (selectedRouteData?.geojson) {
+    cacheRouteOffline(
+      selectedRouteData.geojson,
+      document.getElementById('startInput').value,
+      document.getElementById('endInput').value
+    );
+  }
+  _origStartSelectedRoute();
+};
+
+
+// ════════════════════════════════════════════════════════
+//  2. HEATMAP OF MISTAKES
+//     Red circles where user made most errors
+// ════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════
+//  3. DANGER ZONE ALERTS
+//     Warn driver when approaching known confusion spots
+// ════════════════════════════════════════════════════════
+let lastDangerAlert   = 0;
+
+function renderDangerZoneMarkers() {
+  dangerZoneMarkers.forEach(m => map.removeLayer(m));
+  dangerZoneMarkers = [];
+
+  dangerZones.forEach(z => {
+    const color = z.severity === 'high' ? '#ef4444' : z.severity === 'medium' ? '#f59e0b' : '#fbbf24';
+    const m = L.circleMarker([z.lat, z.lon], {
+      radius:8, color, fillColor:color, fillOpacity:0.6, weight:2
+    }).addTo(map);
+    m.bindPopup(`⚠️ Danger zone — ${z.hits} confusion events here`);
+    dangerZoneMarkers.push(m);
+  });
+}
+
+function showDangerAlert(msg) {
+  const el = document.getElementById('dangerAlert');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(dangerAlertTimer);
+  dangerAlertTimer = setTimeout(() => el.style.display = 'none', 6000);
+}
+
+// Load danger zones on page load
+loadDangerZones();
+
+
+// ════════════════════════════════════════════════════════
+//  4. TURN DIFFICULTY PREDICTION
+//     Shows Easy/Medium/Hard badge for upcoming turn
+// ════════════════════════════════════════════════════════
+let lastDiffCheck = 0;
+
+async function predictTurnDifficulty(lat, lon) {
+  const now = Date.now();
+  if (now - lastDiffCheck < 10000) return; // check every 10s
+  lastDiffCheck = now;
+
+  if (!routeInstructions.length || !navigationStarted) return;
+
+  // Gather next 3 turns
+  const upcomingTurns = [];
+  for (let i = currentInstIdx; i < Math.min(currentInstIdx+3, routeInstructions.length); i++) {
+    const step = routeInstructions[i];
+    if (!step.way_points || !step.instruction) continue;
+    const wi   = step.way_points[0];
+    if (wi >= routeCoords.length) continue;
+    upcomingTurns.push({
+      instruction: step.instruction,
+      lat: routeCoords[wi][1],
+      lon: routeCoords[wi][0],
+      distance: step.distance || 0
+    });
+  }
+
+  if (!upcomingTurns.length) return;
+
+  try {
+    const res  = await fetch('/turn_difficulty', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ turns: upcomingTurns })
+    });
+    turnDifficulties = await res.json();
+    updateTurnDiffBadge(turnDifficulties[0]);
+  } catch(e) { console.warn('Turn difficulty failed:', e); }
+}
+
+function updateTurnDiffBadge(t) {
+  if (!t || !navigationStarted) return;
+  const badge = document.getElementById('turnDiffBadge');
+  const colors = { Easy:'var(--grn)', Medium:'var(--org)', Hard:'var(--red)' };
+  badge.textContent = `${t.emoji} Next turn: ${t.difficulty}`;
+  badge.style.color = colors[t.difficulty] || 'var(--txt)';
+  badge.style.borderColor = colors[t.difficulty] || 'var(--bdr)';
+  badge.style.display = 'block';
+
+  // Warn for hard turns
+  if (t.difficulty === 'Hard' && t.distance < 500) {
+    showConfusion(`🔴 Hard turn ahead! ${t.past_confusion > 0 ? 'You struggled here before.' : 'Be careful.'}`);
+  }
+}
+
+
+// ════════════════════════════════════════════════════════
+//  5. LANE ARROWS
+//     Visual lane guidance based on upcoming instruction
+// ════════════════════════════════════════════════════════
+function updateLaneGuide(instruction) {
+  const guide = document.getElementById('laneGuide');
+  const lower = instruction.toLowerCase();
+
+  let lanes = [];
+  if      (lower.includes('sharp right'))  lanes = ['⬆️','➡️','↪️'];
+  else if (lower.includes('sharp left'))   lanes = ['↩️','⬅️','⬆️'];
+  else if (lower.includes('right'))        lanes = ['⬆️','⬆️','➡️'];
+  else if (lower.includes('left'))         lanes = ['⬅️','⬆️','⬆️'];
+  else if (lower.includes('u-turn'))       lanes = ['🔄','🔄'];
+  else if (lower.includes('straight') || lower.includes('continue')) lanes = ['⬆️','⬆️','⬆️'];
+  else { guide.classList.remove('show'); return; }
+
+  // Active lane index
+  const activeIdx = lower.includes('right') ? lanes.length-1
+                  : lower.includes('left')  ? 0
+                  : Math.floor(lanes.length/2);
+
+  guide.innerHTML = lanes.map((arrow, i) =>
+    `<div class="lane-arrow ${i===activeIdx?'active':''}">${arrow}</div>`
+  ).join('');
+  guide.classList.add('show');
+
+  // Auto hide after 8s
+  setTimeout(() => guide.classList.remove('show'), 8000);
+}
+
+
+// ════════════════════════════════════════════════════════
+//  6. ROUTE MEMORY
+//     Learns from past trips on same route
+// ════════════════════════════════════════════════════════
+
+function closeMemoryBanner() {
+  document.getElementById('routeMemoryBanner').classList.remove('show');
+}
+
+
+// ════════════════════════════════════════════════════════
+//  HOOK INTO EXISTING FUNCTIONS
+// ════════════════════════════════════════════════════════
+
+// Hook into buildRouteCards to check route memory
+const _origBuildRouteCards = buildRouteCards;
+window.buildRouteCards = function(defs, sC, eC) {
+  _origBuildRouteCards(defs, sC, eC);
+  // Check route memory after cards built
+  checkRouteMemory(sC, eC);
+};
+
+// Hook into runNavigationEngine to add Phase 2 checks
+const _origRunNav = runNavigationEngine;
+window.runNavigationEngine = function(lat, lon, speed, now) {
+  _origRunNav(lat, lon, speed, now);
+
+  // Danger zone check
+  checkDangerZones(lat, lon);
+
+  // Turn difficulty prediction (async, non-blocking)
+  predictTurnDifficulty(lat, lon);
+};
+
+// Hook into giveInstruction to show lane guide
+const _origGiveInstruction = giveInstruction;
+window.giveInstruction = function(idx) {
+  _origGiveInstruction(idx);
+  if (routeInstructions[idx]) {
+    updateLaneGuide(routeInstructions[idx].instruction || '');
+  }
+};
+
+// Hook into endNavigation to save route memory
+const _origEndNav = endNavigation;
+window.endNavigation = async function() {
+  // Save route memory before ending
+  await saveRouteMemory(
+    selectedRouteId || 'unknown',
+    deviationCount,
+    confusionCount
+  );
+  // Refresh danger zones after trip
+  setTimeout(loadDangerZones, 2000);
+  // Hide Phase 2 UI
+  document.getElementById('turnDiffBadge').style.display = 'none';
+  document.getElementById('laneGuide').classList.remove('show');
+  closeMemoryBanner();
+  memoryBannerShown = false;
+  return _origEndNav();
+};
+
+// Hook closeSummary to reset Phase 2 state
+const _origCloseSummary = closeSummary;
+window.closeSummary = function() {
+  _origCloseSummary();
+  memoryBannerShown = false;
+  document.getElementById('turnDiffBadge').style.display = 'none';
+  document.getElementById('laneGuide').classList.remove('show');
+};
+
 
 </script>
-
 </body>
 </html>

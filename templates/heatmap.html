@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>DriveIQ – Mistake Heatmap</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+  <style>
+    :root {
+      --bg:#050810; --s1:#0d1117; --s2:#161d2e;
+      --acc:#3b82f6; --acc2:#06b6d4; --grn:#10b981; --org:#f59e0b;
+      --red:#ef4444; --txt:#f1f5f9; --mu:#64748b; --bdr:rgba(255,255,255,0.07);
+      --glass:rgba(13,17,23,0.94);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--txt); height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+
+    .header {
+      background:var(--s1); border-bottom:1px solid var(--bdr);
+      padding:12px 24px; display:flex; align-items:center; gap:16px; flex-shrink:0; z-index:100;
+    }
+    .logo { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; background:linear-gradient(120deg,var(--acc),var(--acc2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .chip { padding:6px 14px; border-radius:8px; font-size:12px; background:var(--s2); border:1px solid var(--bdr); color:var(--mu); text-decoration:none; transition:.2s; }
+    .chip:hover { border-color:var(--acc); color:var(--txt); }
+    .header-title { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; }
+
+    .body { display:flex; flex:1; overflow:hidden; }
+
+    #map { flex:1; filter:saturate(0.65) brightness(0.8); }
+
+    .sidebar {
+      width:280px; background:var(--s1); border-left:1px solid var(--bdr);
+      overflow-y:auto; flex-shrink:0; display:flex; flex-direction:column;
+    }
+
+    .section { padding:16px; border-bottom:1px solid var(--bdr); }
+    .section-title { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--mu); margin-bottom:12px; }
+
+    .legend-item { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+    .legend-dot  { width:14px; height:14px; border-radius:50%; flex-shrink:0; }
+
+    .stat-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; }
+    .stat-row:last-child { border:none; }
+    .stat-val { font-family:'Syne',sans-serif; font-size:18px; font-weight:700; }
+
+    .zone-list { display:flex; flex-direction:column; gap:6px; }
+    .zone-item { padding:10px 12px; border-radius:10px; background:var(--s2); border:1px solid var(--bdr); font-size:12px; }
+    .zone-item.high   { border-color:rgba(239,68,68,0.4); }
+    .zone-item.medium { border-color:rgba(245,158,11,0.3); }
+    .zone-tag { font-weight:700; font-size:11px; text-transform:uppercase; }
+
+    .filter-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+    .filter-btn { padding:5px 10px; border-radius:20px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--bdr); background:var(--s2); color:var(--mu); transition:.2s; }
+    .filter-btn.active { border-color:var(--acc); color:var(--txt); background:rgba(59,130,246,0.1); }
+
+    .btn-primary { width:100%; padding:10px; background:linear-gradient(135deg,var(--acc),var(--acc2)); border:none; border-radius:9px; color:white; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; cursor:pointer; margin-top:8px; transition:opacity .2s; }
+    .btn-primary:hover { opacity:.9; }
+
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.6)} 70%{box-shadow:0 0 0 14px rgba(239,68,68,0)} }
+    .pulse-marker { animation:pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">⚡ DriveIQ</div>
+  <div class="header-title">🔥 Mistake Heatmap</div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="/map" class="chip">🗺 Map</a>
+    <a href="/dashboard" class="chip">📊 Dashboard</a>
+    <a href="/logout" class="chip">🚪 Logout</a>
+  </div>
+</div>
+
+<div class="body">
+  <div id="map"></div>
+
+  <div class="sidebar">
+
+    <!-- Stats -->
+    <div class="section">
+      <div class="section-title">📊 Heatmap Stats</div>
+      <div class="stat-row"><span>Total Zones</span><span class="stat-val" id="totalZones">--</span></div>
+      <div class="stat-row"><span>🔴 High Risk</span><span class="stat-val" style="color:var(--red)" id="highZones">--</span></div>
+      <div class="stat-row"><span>🟡 Medium</span><span class="stat-val" style="color:var(--org)" id="medZones">--</span></div>
+      <div class="stat-row"><span>🟢 Low</span><span class="stat-val" style="color:var(--grn)" id="lowZones">--</span></div>
+      <div class="stat-row"><span>Total Incidents</span><span class="stat-val" style="color:var(--acc)" id="totalIncidents">--</span></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="section">
+      <div class="section-title">🔍 Filter</div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setFilter('all')">All</button>
+        <button class="filter-btn" onclick="setFilter('high')">🔴 High</button>
+        <button class="filter-btn" onclick="setFilter('medium')">🟡 Medium</button>
+        <button class="filter-btn" onclick="setFilter('low')">🟢 Low</button>
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setTypeFilter('all')">All Types</button>
+        <button class="filter-btn" onclick="setTypeFilter('late_turn')">Late Turn</button>
+        <button class="filter-btn" onclick="setTypeFilter('sudden_stop')">Sudden Stop</button>
+        <button class="filter-btn" onclick="setTypeFilter('repeated_reroute')">Reroute</button>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="section">
+      <div class="section-title">🗺 Legend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444;box-shadow:0 0 8px #ef4444"></div>High risk zone (5+ incidents)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Medium risk zone (3–4 incidents)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fbbf24;opacity:0.7"></div>Low risk zone (1–2 incidents)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Your current location</div>
+    </div>
+
+    <!-- Top danger zones list -->
+    <div class="section" style="flex:1">
+      <div class="section-title">⚠️ Top Danger Zones</div>
+      <div class="zone-list" id="zoneList">
+        <div style="color:var(--mu);font-size:13px">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+if (typeof L === 'undefined') {
+  document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif;color:white;background:#050810">⚠️ Map failed to load. Check your connection.</div>';
+}
+
+const map = L.map('map').setView([17.385, 78.4867], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OSM' }).addTo(map);
+
+let allData = [];
+let allCircles = [];
+let activeFilter = 'all';
+let activeTypeFilter = 'all';
+let userMarker = null;
+
+// ── LOAD DATA ──
+async function loadHeatmap() {
+  try {
+    const res  = await fetch('/heatmap_data');
+    allData = await res.json();
+
+    if (!allData.length) {
+      document.getElementById('zoneList').innerHTML =
+        '<div style="color:var(--mu);font-size:13px">No mistake data yet.<br>Drive more to build your heatmap.</div>';
+      return;
+    }
+
+    // Also load danger zones for extra info
+    const dRes   = await fetch('/danger_zones');
+    const dZones = await dRes.json();
+
+    updateStats(dZones);
+    drawCircles(allData);
+    drawZoneList(dZones);
+
+    // Fit map to data
+    if (allData.length) {
+      const lats = allData.map(d => d.lat);
+      const lons = allData.map(d => d.lon);
+      map.fitBounds([[Math.min(...lats), Math.min(...lons)], [Math.max(...lats), Math.max(...lons)]], { padding:[40,40] });
+    }
+  } catch(e) { console.error(e); }
+}
+
+function updateStats(zones) {
+  const high   = zones.filter(z => z.severity==='high').length;
+  const medium = zones.filter(z => z.severity==='medium').length;
+  const low    = zones.filter(z => z.severity==='low').length;
+  const total  = allData.reduce((a,b) => a + b.intensity, 0);
+
+  document.getElementById('totalZones').textContent    = zones.length;
+  document.getElementById('highZones').textContent     = high;
+  document.getElementById('medZones').textContent      = medium;
+  document.getElementById('lowZones').textContent      = low;
+  document.getElementById('totalIncidents').textContent = total;
+}
+
+function drawCircles(data) {
+  allCircles.forEach(c => map.removeLayer(c));
+  allCircles = [];
+
+  const maxI = Math.max(...data.map(d => d.intensity), 1);
+
+  data.forEach(pt => {
+    const ratio   = pt.intensity / maxI;
+    const radius  = 40 + ratio * 160;
+    const color   = ratio > 0.7 ? '#ef4444' : ratio > 0.4 ? '#f59e0b' : '#fbbf24';
+    const opacity = 0.12 + ratio * 0.38;
+
+    const circle = L.circle([pt.lat, pt.lon], {
+      radius, color, fillColor:color, fillOpacity:opacity, weight:1,
+    }).addTo(map).bindPopup(
+      `<div style="font-family:'DM Sans',sans-serif">
+        <b>⚠️ Mistake Zone</b><br>
+        Incidents: <b>${pt.intensity}</b><br>
+        Risk: ${ratio > 0.7 ? '🔴 High' : ratio > 0.4 ? '🟡 Medium' : '🟢 Low'}
+      </div>`
+    );
+    allCircles.push(circle);
+  });
+}
+
+function drawZoneList(zones) {
+  const list = document.getElementById('zoneList');
+  if (!zones.length) { list.innerHTML = '<div style="color:var(--mu);font-size:13px">No significant danger zones yet.</div>'; return; }
+
+  list.innerHTML = zones.slice(0,10).map(z => `
+    <div class="zone-item ${z.severity}" onclick="map.setView([${z.lat},${z.lon}],16)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="zone-tag" style="color:${z.severity==='high'?'#f87171':z.severity==='medium'?'#fbbf24':'#34d399'}">
+          ${z.severity==='high'?'🔴':z.severity==='medium'?'🟡':'🟢'} ${z.severity}
+        </span>
+        <span style="color:var(--mu);font-size:11px">${z.hits}x</span>
+      </div>
+      <div style="color:var(--mu);margin-top:3px;font-size:11px">${z.type.replace(/_/g,' ')}</div>
+      <div style="color:var(--mu);font-size:10px;margin-top:2px">${z.lat.toFixed(4)}, ${z.lon.toFixed(4)}</div>
+    </div>
+  `).join('');
+}
+
+// ── FILTERS ──
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-row:first-of-type .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  applyFilters();
+}
+
+function setTypeFilter(f) {
+  activeTypeFilter = f;
+  document.querySelectorAll('.filter-row:last-of-type .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const maxI = Math.max(...allData.map(d => d.intensity), 1);
+  allCircles.forEach((c, i) => {
+    const pt    = allData[i];
+    const ratio = pt.intensity / maxI;
+    const sev   = ratio > 0.7 ? 'high' : ratio > 0.4 ? 'medium' : 'low';
+    const show  = (activeFilter === 'all' || activeFilter === sev);
+    if (show) map.addLayer(c);
+    else      map.removeLayer(c);
+  });
+}
+
+// ── GPS ──
+navigator.geolocation.getCurrentPosition(pos => {
+  const lat = pos.coords.latitude, lon = pos.coords.longitude;
+  const icon = L.divIcon({
+    html:'<div style="width:14px;height:14px;background:#8b5cf6;border-radius:50%;border:2px solid white;box-shadow:0 0 0 0 rgba(139,92,246,0.6)"></div>',
+    className:'', iconSize:[14,14], iconAnchor:[7,7]
+  });
+  userMarker = L.marker([lat,lon],{icon}).addTo(map).bindPopup('📍 Your Location');
+}, () => {});
+
+loadHeatmap();
+</script>
+</body>
+</html>

@@ -1,137 +1,374 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Driver Dashboard</title>
+  <title>DriveIQ – Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg:#050810;--s1:#0d1117;--s2:#161d2e;--s3:#1e2740;
+      --acc:#3b82f6;--acc2:#06b6d4;--grn:#10b981;--org:#f59e0b;
+      --red:#ef4444;--pur:#8b5cf6;--txt:#f1f5f9;--mu:#64748b;
+      --bdr:rgba(255,255,255,0.07);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    .header{background:var(--s1);border-bottom:1px solid var(--bdr);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .logo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;background:linear-gradient(120deg,var(--acc),var(--acc2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .header-right{display:flex;gap:10px;align-items:center}
+    .chip{padding:7px 14px;border-radius:8px;font-size:13px;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);text-decoration:none;transition:.2s}
+    .chip:hover{border-color:var(--acc);color:var(--txt)}
 
-    <style>
-        body{
-            font-family: Arial;
-            background:#f5f6fa;
-            margin:0;
-            padding:20px;
-        }
+    .main{max-width:1100px;margin:0 auto;padding:28px 20px}
+    .page-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:4px}
+    .page-sub{color:var(--mu);font-size:13px;margin-bottom:28px}
 
-        h2{
-            text-align:center;
-        }
+    /* PROFILE HERO */
+    .profile-hero{
+      background:var(--s1);border:1px solid var(--bdr);border-radius:20px;
+      padding:24px 28px;margin-bottom:24px;
+      display:grid;grid-template-columns:auto 1fr auto auto;gap:24px;align-items:center;
+    }
+    .avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:26px;font-weight:800}
+    .profile-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
+    .profile-sub{font-size:12px;color:var(--mu);margin-top:3px}
 
-        .card{
-            background:white;
-            padding:20px;
-            border-radius:10px;
-            margin-bottom:20px;
-            box-shadow:0 2px 8px rgba(0,0,0,0.1);
-        }
+    .skill-pill{padding:6px 16px;border-radius:20px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    .pill-expert  {background:rgba(16,185,129,.2);color:#34d399}
+    .pill-average {background:rgba(245,158,11,.2);color:#fbbf24}
+    .pill-beginner{background:rgba(139,92,246,.2);color:#a78bfa}
 
-        table{
-            width:100%;
-            border-collapse:collapse;
-        }
+    .weakness-box{background:var(--s2);border:1px solid var(--bdr);border-radius:12px;padding:14px 18px;min-width:220px}
+    .weakness-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-bottom:6px}
+    .weakness-val{font-size:13px;color:var(--txt);line-height:1.4}
 
-        th, td{
-            padding:10px;
-            border-bottom:1px solid #ddd;
-            text-align:center;
-        }
+    /* STAT CARDS */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+    .stat-card{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+    .stat-card.c-blue::before{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+    .stat-card.c-green::before{background:var(--grn)}
+    .stat-card.c-org::before{background:var(--org)}
+    .stat-card.c-red::before{background:var(--red)}
+    .stat-card.c-pur::before{background:var(--pur)}
+    .stat-emoji{font-size:22px;margin-bottom:6px}
+    .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu)}
+    .stat-value{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;margin-top:4px;line-height:1}
 
-        th{
-            background:#2d3436;
-            color:white;
-        }
+    /* FOCUS BAR */
+    .focus-section{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:20px 24px;margin-bottom:24px}
+    .focus-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .focus-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+    .focus-score-big{font-family:'Syne',sans-serif;font-size:32px;font-weight:800}
+    .focus-bar{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin:6px 0}
+    .focus-fill{height:100%;border-radius:4px;transition:width .8s ease}
+    .focus-legend{display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--mu)}
+    .focus-legend span{display:flex;align-items:center;gap:5px}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
 
-        .top{
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            margin-bottom:10px;
-        }
+    /* CHARTS */
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+    @media(max-width:700px){.charts-grid{grid-template-columns:1fr}}
+    .card{background:var(--s1);border:1px solid var(--bdr);border-radius:16px;padding:22px}
+    .card-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:8px}
 
-        a{
-            text-decoration:none;
-            color:#0984e3;
-            font-weight:bold;
-        }
-    </style>
+    /* TABLE */
+    table{width:100%;border-collapse:collapse}
+    th{padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu);border-bottom:1px solid var(--bdr)}
+    td{padding:11px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+
+    .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .b-safe  {background:rgba(16,185,129,.15);color:#34d399}
+    .b-avg   {background:rgba(245,158,11,.15);color:#fbbf24}
+    .b-risky {background:rgba(239,68,68,.15);color:#f87171}
+
+    .score-pill{display:inline-block;padding:2px 9px;border-radius:20px;font-weight:700;font-size:12px}
+
+    /* SUGGESTIONS */
+    .suggestion-item{padding:10px 14px;border-radius:10px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.18);font-size:13px;margin-bottom:8px;line-height:1.4}
+
+    .empty-state{text-align:center;padding:60px;color:var(--mu)}
+    .empty-state .icon{font-size:48px;margin-bottom:12px}
+    .empty-state a{display:inline-block;margin-top:16px;padding:10px 20px;background:var(--acc);color:white;border-radius:10px;text-decoration:none;font-weight:600}
+  </style>
 </head>
-
 <body>
 
-<div class="top">
-    <h2>📊 Driver Dashboard</h2>
-    <a href="/">⬅ Back</a>
+<div class="header">
+  <div class="logo">⚡ DriveIQ</div>
+  <div class="header-right">
+    <span style="font-size:13px;color:var(--mu)">👤 {{ username }}</span>
+    <a href="/map" class="chip">🗺 Map</a>
+    <a href="/analytics" class="chip" style="border-color:rgba(139,92,246,0.3);color:#a78bfa">🤖 AI Analytics</a>
+    <a href="/heatmap" class="chip" style="border-color:rgba(239,68,68,0.3);color:#f87171">🔥 Heatmap</a>
+    <a href="/logout" class="chip">🚪 Logout</a>
+  </div>
 </div>
 
-<!-- ================= GRAPH ================= -->
-<div class="card">
-    <canvas id="chart"></canvas>
-</div>
+<div class="main">
+  <div class="page-title">📊 Driver Dashboard</div>
+  <div class="page-sub">Your complete driving profile and performance analytics</div>
 
-<!-- ================= TABLE ================= -->
-<div class="card">
-    <h3>📋 Driving History</h3>
+  <!-- DRIVER LEARNING PROFILE (Feature 4, 21) -->
+  <div class="profile-hero">
+    <div class="avatar">{{ username[0].upper() }}</div>
+    <div>
+      <div class="profile-name">{{ username }}</div>
+      <div class="profile-sub">{{ profile.total_rides }} trips recorded · Avg score {{ profile.avg_score }}</div>
+      <div style="font-size:12px;color:var(--mu);margin-top:4px">
+        {% if profile.avoid_complex_turns %}⚠️ Struggles at complex turns &nbsp;{% endif %}
+        {% if profile.prefer_simple_routes %}⚠️ Tends to deviate &nbsp;{% endif %}
+        {% if profile.needs_early_warnings %}🔔 Benefits from early warnings{% endif %}
+      </div>
+    </div>
+    <div>
+      <span class="skill-pill pill-{{ profile.skill_level.lower() }}">{{ profile.skill_level }}</span>
+      <div style="font-size:11px;color:var(--mu);margin-top:8px;text-align:center">Driver Level</div>
+    </div>
+    <div class="weakness-box">
+      <div class="weakness-label">🧠 AI Detected Pattern</div>
+      <div class="weakness-val">
+        {% if profile.weakness == 'None detected' %}
+          ✅ No significant weaknesses detected
+        {% else %}
+          {{ profile.weakness }}
+        {% endif %}
+      </div>
+      <div style="font-size:11px;color:var(--mu);margin-top:8px">Voice mode: <b style="color:var(--acc2)">{{ profile.voice_detail }}</b></div>
+    </div>
+  </div>
 
+  {% if data %}
+
+  {% set avg_score = (data | map(attribute=3) | list | sum) / data|length %}
+  {% set best = data | map(attribute=3) | list | max %}
+  {% set trips = data|length %}
+
+  <!-- STAT CARDS -->
+  <div class="stats-grid">
+    <div class="stat-card c-blue">
+      <div class="stat-emoji">🏁</div>
+      <div class="stat-label">Total Trips</div>
+      <div class="stat-value">{{ trips }}</div>
+    </div>
+    <div class="stat-card c-green">
+      <div class="stat-emoji">⭐</div>
+      <div class="stat-label">Avg Score</div>
+      <div class="stat-value">{{ "%.0f"|format(avg_score) }}</div>
+    </div>
+    <div class="stat-card c-org">
+      <div class="stat-emoji">🏆</div>
+      <div class="stat-label">Best Score</div>
+      <div class="stat-value">{{ best }}</div>
+    </div>
+    <div class="stat-card c-red">
+      <div class="stat-emoji">📍</div>
+      <div class="stat-label">Avg Deviations</div>
+      <div class="stat-value">{{ "%.1f"|format(profile.avg_deviations) }}</div>
+    </div>
+    <div class="stat-card c-pur">
+      <div class="stat-emoji">🧠</div>
+      <div class="stat-label">Focus Score</div>
+      <div class="stat-value">{{ profile.focus_score }}</div>
+    </div>
+  </div>
+
+  <!-- FOCUS SCORE (Feature 10) -->
+  <div class="focus-section">
+    <div class="focus-header">
+      <div class="focus-title">🎯 Focus Score — {{ "%.0f"|format(profile.focus_score) }}/100</div>
+      <div class="focus-score-big" style="color:{% if profile.focus_score >= 75 %}var(--grn){% elif profile.focus_score >= 50 %}var(--org){% else %}var(--red){% endif %}">
+        {% if profile.focus_score >= 75 %}High 🟢{% elif profile.focus_score >= 50 %}Medium 🟡{% else %}Low 🔴{% endif %}
+      </div>
+    </div>
+    <div class="focus-bar">
+      <div class="focus-fill" style="width:{{ profile.focus_score }}%;background:{% if profile.focus_score >= 75 %}var(--grn){% elif profile.focus_score >= 50 %}var(--org){% else %}var(--red){% endif %}"></div>
+    </div>
+    <div class="focus-legend">
+      <span><span class="dot" style="background:var(--grn)"></span> High (75+)</span>
+      <span><span class="dot" style="background:var(--org)"></span> Medium (50–74)</span>
+      <span><span class="dot" style="background:var(--red)"></span> Low (0–49)</span>
+    </div>
+    <div style="font-size:12px;color:var(--mu);margin-top:10px">
+      Based on: stops ({{ "%.1f"|format(profile.avg_stops) }} avg) · deviations ({{ "%.1f"|format(profile.avg_deviations) }} avg) · confusion events ({{ "%.1f"|format(profile.avg_confusion) }} avg)
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-title">📈 Score Improvement Over Time</div>
+      <canvas id="scoreChart" height="160"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Behavior Breakdown</div>
+      <canvas id="behaviorChart" height="160"></canvas>
+    </div>
+  </div>
+
+  <!-- RIDE SUMMARIES (Feature 24) -->
+  {% if summaries %}
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-title">🏁 Recent Ride Summaries & Suggestions</div>
+    {% for s in summaries[:5] %}
+    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bdr)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:600">
+          Score: <span style="color:{% if s[0] >= 70 %}var(--grn){% elif s[0] >= 50 %}var(--org){% else %}var(--red){% endif %}">{{ s[0] }}</span>
+          &nbsp;·&nbsp; Focus: <b>{{ s[1] }}</b>
+        </span>
+        <span style="font-size:11px;color:var(--mu)">{{ s[2] }}</span>
+      </div>
+      {% if s[3] %}
+        {% for tip in s[3].split(' | ') %}
+        <div class="suggestion-item">💡 {{ tip }}</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- PHASE 2: HEATMAP PREVIEW + ROUTE MEMORY -->
+  <div class="charts-grid" style="margin-bottom:24px">
+
+    <!-- Heatmap preview card -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;gap:14px;border-color:rgba(239,68,68,0.2)">
+      <div style="font-size:48px">🔥</div>
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700">Mistake Heatmap</div>
+      <div style="font-size:13px;color:var(--mu);line-height:1.5">
+        See exactly where on the map you make mistakes — red zones show your confusion hotspots
+      </div>
+      <a href="/heatmap" style="display:inline-block;padding:10px 20px;background:var(--red);color:white;border-radius:10px;text-decoration:none;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-top:4px">
+        Open Heatmap →
+      </a>
+    </div>
+
+    <!-- Route memory summary -->
+    <div class="card">
+      <div class="card-title">🧠 Route Memory</div>
+      {% if profile.total_rides > 0 %}
+      <div style="font-size:13px;color:var(--mu);margin-bottom:14px">
+        System has learned from your <b style="color:var(--txt)">{{ profile.total_rides }}</b> trips
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:10px">
+          <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Detected Weakness</div>
+          <div style="font-size:13px">{{ profile.weakness if profile.weakness != 'None detected' else '✅ No significant patterns' }}</div>
+        </div>
+        <div style="padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:10px">
+          <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Voice Mode (AI set)</div>
+          <div style="font-size:13px;color:var(--acc2);font-weight:600;text-transform:capitalize">{{ profile.voice_detail }} instructions</div>
+        </div>
+        <div style="padding:12px;background:var(--s2);border:1px solid var(--bdr);border-radius:10px">
+          <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Route Preference</div>
+          <div style="font-size:13px">
+            {% if profile.prefer_simple_routes %}Simpler routes recommended{% elif profile.avoid_complex_turns %}Fewer complex turns{% else %}No strong preference{% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:24px;color:var(--mu)">
+        <div style="font-size:32px;margin-bottom:8px">🚗</div>
+        Complete your first trip to build route memory
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- TRIP HISTORY TABLE -->
+  <div class="card">
+    <div class="card-title">📋 Trip History</div>
     <table>
+      <thead>
         <tr>
-            <th>Deviation</th>
-            <th>Stops</th>
-            <th>Confusion</th>
-            <th>Score</th>
-            <th>Type</th>
-            <th>Time</th>
+          <th>#</th><th>Score</th><th>Deviations</th><th>Stops</th><th>Confusion</th><th>Type</th><th>Time</th>
         </tr>
-
+      </thead>
+      <tbody>
         {% for row in data %}
+        {% set score = row[3] %}
         <tr>
-            <td>{{ row[2] }}</td>
-            <td>{{ row[3] }}</td>
-            <td>{{ row[4] }}</td>
-            <td>{{ row[5] }}</td>
-            <td>{{ row[6] }}</td>
-            <td>{{ row[7] }}</td>
+          <td style="color:var(--mu)">{{ loop.index }}</td>
+          <td>
+            <span class="score-pill" style="background:{% if score >= 70 %}rgba(16,185,129,.15);color:#34d399{% elif score >= 50 %}rgba(245,158,11,.15);color:#fbbf24{% else %}rgba(239,68,68,.15);color:#f87171{% endif %}">{{ score }}</span>
+          </td>
+          <td>{{ row[0] }}</td>
+          <td>{{ row[1] }}</td>
+          <td>{{ row[2] }}</td>
+          <td><span class="badge {% if 'Safe' in row[4] %}b-safe{% elif 'Risky' in row[4] %}b-risky{% else %}b-avg{% endif %}">{{ row[4] }}</span></td>
+          <td style="color:var(--mu);font-size:11px">{{ row[5] }}</td>
         </tr>
         {% endfor %}
-
+      </tbody>
     </table>
-</div>
+  </div>
 
-<!-- ================= SCRIPT ================= -->
-<script>
-    // FIXED: using |tojson (important)
+  <script>
+    const rawData = {{ data | tojson }};
+    const scores  = rawData.map(r => r[3]).reverse();
+    const labels  = rawData.map((_, i) => `T${rawData.length - i}`).reverse();
+    const devs    = rawData.map(r => r[0]);
+    const stops   = rawData.map(r => r[1]);
+    const confs   = rawData.map(r => r[2]);
 
-    let scores = {{ data | map(attribute=5) | list | tojson }};
-    let labels = {{ data | map(attribute=7) | list | tojson }};
+    const chartDefaults = {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+      }
+    };
 
-    new Chart(document.getElementById("chart"), {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Score",
-                data: scores,
-                fill: false,
-                tension: 0.3
-            }]
-        }
-    });
-</script>
-<canvas id="chart"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-let scores = {{ data|map(attribute=3)|list|safe }};
-
-new Chart(document.getElementById("chart"), {
-    type: 'line',
-    data: {
-        labels: scores.map((_,i)=>i+1),
+    // Score chart
+    new Chart(document.getElementById('scoreChart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
         datasets: [{
-            label: "Driving Score",
-            data: scores
+          label: 'Score',
+          data: scores,
+          fill: true,
+          tension: 0.4,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          pointBackgroundColor: scores.map(s => s >= 70 ? '#10b981' : s >= 50 ? '#f59e0b' : '#ef4444'),
+          pointRadius: 4, borderWidth: 2
         }]
-    }
-});
-</script>
+      },
+      options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0, max: 100 } } }
+    });
+
+    // Behavior chart
+    new Chart(document.getElementById('behaviorChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels.slice(-10),
+        datasets: [
+          { label: 'Deviations', data: devs.slice(0,10).reverse(), backgroundColor: 'rgba(239,68,68,0.6)', borderRadius: 4 },
+          { label: 'Stops',      data: stops.slice(0,10).reverse(), backgroundColor: 'rgba(245,158,11,0.6)', borderRadius: 4 },
+          { label: 'Confusion',  data: confs.slice(0,10).reverse(), backgroundColor: 'rgba(139,92,246,0.6)', borderRadius: 4 }
+        ]
+      },
+      options: { ...chartDefaults, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: false } } }
+    });
+  </script>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🚗</div>
+    <div>No trips yet.</div>
+    <div style="margin-top:6px;font-size:13px;color:var(--mu)">Start a navigation session to record your first trip.</div>
+    <a href="/map">Open Map →</a>
+  </div>
+  {% endif %}
+</div>
 
 </body>
 </html>

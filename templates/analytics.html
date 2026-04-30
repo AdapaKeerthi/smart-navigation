@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>DriveIQ – AI Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{--bg:#050810;--s1:#0d1117;--s2:#161d2e;--s3:#1e2740;
+      --acc:#3b82f6;--acc2:#06b6d4;--grn:#10b981;--org:#f59e0b;
+      --red:#ef4444;--pur:#8b5cf6;--txt:#f1f5f9;--mu:#64748b;--bdr:rgba(255,255,255,0.07)}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+    .header{background:var(--s1);border-bottom:1px solid var(--bdr);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .logo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;background:linear-gradient(120deg,var(--acc),var(--acc2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .chip{padding:7px 14px;border-radius:8px;font-size:13px;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);text-decoration:none;transition:.2s}
+    .chip:hover{border-color:var(--acc);color:var(--txt)}
+    .main{max-width:1200px;margin:0 auto;padding:28px 20px}
+    .page-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:4px}
+    .page-sub{color:var(--mu);font-size:13px;margin-bottom:28px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+    .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+    @media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+    .card{background:var(--s1);border:1px solid var(--bdr);border-radius:16px;padding:22px}
+    .card-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+    .stat-card{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+    .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+    .sc-blue::before{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+    .sc-green::before{background:var(--grn)}
+    .sc-org::before{background:var(--org)}
+    .sc-pur::before{background:var(--pur)}
+    .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu)}
+    .stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-top:4px}
+    .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .b-safe{background:rgba(16,185,129,.15);color:#34d399}
+    .b-avg{background:rgba(245,158,11,.15);color:#fbbf24}
+    .b-risky{background:rgba(239,68,68,.15);color:#f87171}
+    .b-aggressive{background:rgba(139,92,246,.15);color:#a78bfa}
+    /* forecast card */
+    .forecast-box{background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+    .forecast-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu);margin-bottom:4px}
+    .forecast-val{font-size:15px;font-weight:600}
+    /* bar chart for feature importance */
+    .fi-bar-wrap{margin-bottom:10px}
+    .fi-label{display:flex;justify-content:space-between;font-size:12px;color:var(--mu);margin-bottom:3px}
+    .fi-bar{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+    .fi-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .8s ease}
+    /* model metrics table */
+    table{width:100%;border-collapse:collapse}
+    th{padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mu);border-bottom:1px solid var(--bdr)}
+    td{padding:10px 12px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04)}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    /* trend pill */
+    .trend-pill{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block}
+    .improving{background:rgba(16,185,129,.15);color:#34d399}
+    .declining{background:rgba(239,68,68,.15);color:#f87171}
+    .stable{background:rgba(100,116,139,.15);color:#94a3b8}
+    /* confidence bar */
+    .conf-bar{height:4px;background:var(--s3);border-radius:2px;margin-top:4px;overflow:hidden}
+    .conf-fill{height:100%;border-radius:2px;background:var(--grn)}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">⚡ DriveIQ</div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span style="font-size:13px;color:var(--mu)">👤 {{ username }}</span>
+    <a href="/dashboard" class="chip">📊 Dashboard</a>
+    <a href="/map" class="chip">🗺 Map</a>
+    <a href="/heatmap" class="chip">🔥 Heatmap</a>
+    <a href="/logout" class="chip">🚪 Logout</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">🤖 AI Analytics Intelligence</div>
+  <div class="page-sub">Machine Learning insights · Predictive modeling · Behavior analysis · Model evaluation</div>
+
+  <!-- STAT OVERVIEW -->
+  <div class="grid4" style="margin-bottom:20px">
+    <div class="stat-card sc-blue">
+      <div class="stat-label">🏁 Total Trips</div>
+      <div class="stat-val">{{ rides|length }}</div>
+    </div>
+    <div class="stat-card sc-green">
+      <div class="stat-label">🎯 Avg Score</div>
+      <div class="stat-val">{% if rides %}{{ "%.0f"|format(rides|map(attribute=3)|list|sum / rides|length) }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="stat-card sc-org">
+      <div class="stat-label">🧬 Driver Class</div>
+      <div class="stat-val" style="font-size:16px;padding-top:6px">
+        {% if profile %}{{ profile.skill_level }}{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="stat-card sc-pur">
+      <div class="stat-label">🔮 Next Ride Risk</div>
+      <div class="stat-val" style="font-size:16px;padding-top:6px">
+        {{ forecast.risk_level if forecast else "—" }}
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Next Ride Prediction + Score Forecast -->
+  <div class="grid2">
+    <!-- Prediction card -->
+    <div class="card">
+      <div class="card-title">🔮 Predictive Intelligence — Next Ride Forecast</div>
+      {% if forecast and forecast.risk_level != 'Unknown' %}
+      <div class="forecast-box">
+        <div class="forecast-label">Predicted Score</div>
+        <div class="forecast-val" style="color:{% if forecast.predicted_score>=70 %}var(--grn){% elif forecast.predicted_score>=50 %}var(--org){% else %}var(--red){% endif %}">
+          {{ forecast.predicted_score }} / 100
+        </div>
+      </div>
+      <div class="forecast-box">
+        <div class="forecast-label">Weighted Score (recent rides weighted more)</div>
+        <div class="forecast-val">{{ forecast.weighted_score }}</div>
+      </div>
+      <div class="forecast-box">
+        <div class="forecast-label">Performance Trend</div>
+        <div class="forecast-val">
+          <span class="trend-pill {% if 'Improving' in forecast.trend %}improving{% elif 'Declining' in forecast.trend %}declining{% else %}stable{% endif %}">
+            {{ forecast.trend }}
+          </span>
+        </div>
+      </div>
+      <div class="forecast-box">
+        <div class="forecast-label">Risk Level for Next Ride</div>
+        <div class="forecast-val" style="color:{% if forecast.risk_level=='Low' %}var(--grn){% elif forecast.risk_level=='Medium' %}var(--org){% else %}var(--red){% endif %}">
+          {{ forecast.risk_level }}
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--mu)">Based on {{ forecast.rides_analysed }} recent rides</div>
+      {% else %}
+      <div style="text-align:center;padding:40px;color:var(--mu)">
+        <div style="font-size:36px;margin-bottom:10px">🚗</div>
+        Complete at least 3 trips to enable AI forecasting
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Score trajectory chart -->
+    <div class="card">
+      <div class="card-title">📈 Score Trajectory + AI Forecast</div>
+      <canvas id="forecastChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- ROW 2: Driver Classification + Feature Importance -->
+  <div class="grid2">
+    <!-- Driver type distribution -->
+    <div class="card">
+      <div class="card-title">🧬 Driver Classification History</div>
+      {% if type_dist %}
+      <canvas id="typeChart" height="200"></canvas>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+        {% for dtype, cnt in type_dist %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--s2);border-radius:8px">
+          <span class="badge {% if 'Safe' in dtype %}b-safe{% elif 'Risky' in dtype %}b-risky{% elif 'Aggressive' in dtype %}b-aggressive{% else %}b-avg{% endif %}">{{ dtype }}</span>
+          <span style="font-size:13px;color:var(--mu)">{{ cnt }} trips</span>
+          <div style="width:80px;height:6px;background:var(--s3);border-radius:3px;overflow:hidden">
+            <div style="height:100%;background:var(--acc);border-radius:3px;width:{{ ((cnt / rides|length)*100)|int if rides else 0 }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px;color:var(--mu)">No classification data yet</div>
+      {% endif %}
+    </div>
+
+    <!-- Feature Importance (Random Forest) -->
+    <div class="card">
+      <div class="card-title">🎛️ AI Feature Importance (Random Forest)</div>
+      {% if feature_importance %}
+        {% set fi_items = feature_importance.items()|list|sort(attribute='1',reverse=True) %}
+        {% for fname, fval in fi_items %}
+        <div class="fi-bar-wrap">
+          <div class="fi-label">
+            <span>{{ fname.replace('_',' ').title() }}</span>
+            <span style="color:var(--txt);font-weight:600">{{ "%.1f"|format(fval*100) }}%</span>
+          </div>
+          <div class="fi-bar">
+            <div class="fi-fill" style="width:{{ "%.0f"|format(fval*100) }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+        <div style="margin-top:14px;font-size:12px;color:var(--mu);line-height:1.6">
+          Higher % = more impact on driver classification decision
+        </div>
+      {% else %}
+      <div style="text-align:center;padding:40px;color:var(--mu)">No feature data yet. Complete a trip to populate.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ROW 3: Model Evaluation (3 models) -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">📊 Model Evaluation — Accuracy · Precision · Recall · F1</div>
+    <div id="modelMetricsContainer">
+      <div style="color:var(--mu);font-size:13px;padding:10px 0">
+        Loading model metrics... <a href="#" onclick="loadMetrics();return false" style="color:var(--acc)">Click to load</a>
+      </div>
+    </div>
+    <canvas id="modelChart" height="120" style="margin-top:20px"></canvas>
+  </div>
+
+  <!-- ROW 4: Behavior Features Table -->
+  {% if features %}
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-title">🔬 Engineered Behavior Features History</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Devs</th><th>Stops</th><th>Confusion</th>
+          <th>Distance(km)</th><th>Duration(min)</th><th>Avg Speed</th>
+          <th>Turns</th><th>Classification</th><th>Confidence</th><th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in features[:20] %}
+        <tr>
+          <td style="color:var(--mu)">{{ loop.index }}</td>
+          <td>{{ f[0] }}</td><td>{{ f[1] }}</td><td>{{ f[2] }}</td>
+          <td>{{ "%.1f"|format(f[3]) }}</td>
+          <td>{{ f[4] }}</td>
+          <td>{{ "%.0f"|format(f[5]) }} km/h</td>
+          <td>{{ f[6] }}</td>
+          <td>
+            <span class="badge {% if 'Safe' in (f[7] or '') %}b-safe{% elif 'Risky' in (f[7] or '') %}b-risky{% elif 'Aggressive' in (f[7] or '') %}b-aggressive{% else %}b-avg{% endif %}">
+              {{ f[7] or 'Unknown' }}
+            </span>
+          </td>
+          <td>
+            <span style="color:{% if f[8]>=70 %}var(--grn){% elif f[8]>=40 %}var(--org){% else %}var(--red){% endif %}">
+              {{ "%.0f"|format(f[8] or 0) }}%
+            </span>
+            <div class="conf-bar"><div class="conf-fill" style="width:{{ "%.0f"|format(f[8] or 0) }}%"></div></div>
+          </td>
+          <td style="color:var(--mu);font-size:11px">{{ f[9] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ROW 5: Behavior charts -->
+  {% if rides %}
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">🧠 Behavior Pattern Analysis</div>
+      <canvas id="behaviorChart" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">📉 Score Distribution</div>
+      <canvas id="distChart" height="220"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+const rides = {{ rides | tojson }};
+const scoreForecast = {{ score_forecast | tojson }};
+
+// ── Score + Forecast Chart ──────────────────────────────────────────────────
+if (rides.length > 0) {
+  const scores = rides.map(r => r[3]).reverse();
+  const labels = rides.map((_,i) => `T${rides.length-i}`).reverse();
+  const fcLabels = scoreForecast.map((_,i) => `F${i+1}`);
+  const fcData   = new Array(scores.length).fill(null).concat(scoreForecast);
+  const allLabels = labels.concat(fcLabels);
+
+  new Chart(document.getElementById('forecastChart').getContext('2d'), {
+    data: {
+      labels: allLabels,
+      datasets: [
+        {
+          type:'line', label:'Actual Score', data: scores.concat(new Array(scoreForecast.length).fill(null)),
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
+          tension:0.4, fill:true, pointRadius:4, borderWidth:2,
+          pointBackgroundColor: scores.map(s => s>=70?'#10b981':s>=50?'#f59e0b':'#ef4444')
+        },
+        {
+          type:'line', label:'AI Forecast', data: fcData,
+          borderColor:'#8b5cf6', borderDash:[6,3], backgroundColor:'rgba(139,92,246,0.05)',
+          tension:0.4, fill:true, pointRadius:4, borderWidth:2,
+          pointBackgroundColor:'#8b5cf6'
+        }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{labels:{color:'#94a3b8',font:{size:11}}} },
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:10}}},
+        y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:10}}}
+      }
+    }
+  });
+}
+
+// ── Classification Donut ───────────────────────────────────────────────────
+const typeDist = {{ type_dist | tojson }};
+if (typeDist.length > 0) {
+  const colorMap = {'Safe Driver':'#10b981','Average Driver':'#f59e0b','Risky Driver':'#ef4444','Aggressive Driver':'#8b5cf6'};
+  new Chart(document.getElementById('typeChart').getContext('2d'), {
+    type:'doughnut',
+    data:{
+      labels: typeDist.map(t=>t[0]),
+      datasets:[{data:typeDist.map(t=>t[1]),
+        backgroundColor:typeDist.map(t=>colorMap[t[0]]||'#3b82f6'),
+        borderWidth:0, hoverOffset:6}]
+    },
+    options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}}}
+  });
+}
+
+// ── Behavior Chart ─────────────────────────────────────────────────────────
+if (rides.length > 0) {
+  const last10 = rides.slice(0,10).reverse();
+  const blabels = last10.map((_,i)=>`T${i+1}`);
+  new Chart(document.getElementById('behaviorChart').getContext('2d'), {
+    type:'bar',
+    data:{labels:blabels,datasets:[
+      {label:'Deviations',data:last10.map(r=>r[0]),backgroundColor:'rgba(239,68,68,0.6)',borderRadius:4},
+      {label:'Stops',data:last10.map(r=>r[1]),backgroundColor:'rgba(245,158,11,0.6)',borderRadius:4},
+      {label:'Confusion',data:last10.map(r=>r[2]),backgroundColor:'rgba(139,92,246,0.6)',borderRadius:4}
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:10}}},
+              y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:10}}}}}
+  });
+
+  // Score distribution histogram
+  const buckets = [0,0,0,0,0]; // 0-20,20-40,40-60,60-80,80-100
+  rides.forEach(r=>{const s=r[3];const i=Math.min(4,Math.floor(s/20));buckets[i]++});
+  new Chart(document.getElementById('distChart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels:['0–20','21–40','41–60','61–80','81–100'],
+      datasets:[{
+        label:'Trips',data:buckets,
+        backgroundColor:['#ef4444','#f87171','#f59e0b','#34d399','#10b981'],
+        borderRadius:6
+      }]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b'}},
+              y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',stepSize:1}}}}
+  });
+}
+
+// ── Load Model Metrics ─────────────────────────────────────────────────────
+async function loadMetrics() {
+  try {
+    const res = await fetch('/model_evaluation');
+    if (!res.ok) { document.getElementById('modelMetricsContainer').innerHTML='<span style="color:var(--mu)">Admin access required to view model metrics.</span>'; return; }
+    const data = await res.json();
+    const models = data.models || {};
+    const names = Object.keys(models);
+    const metrics = ['accuracy','precision','recall','f1'];
+
+    let html = `<div style="overflow-x:auto"><table>
+      <thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>CV Accuracy</th></tr></thead><tbody>`;
+    names.forEach(name => {
+      const m = models[name];
+      const color = m.accuracy>=0.9?'#10b981':m.accuracy>=0.75?'#f59e0b':'#ef4444';
+      html += `<tr>
+        <td style="font-weight:600;text-transform:capitalize">${name.replace(/_/g,' ')}</td>
+        <td style="color:${color};font-weight:700">${(m.accuracy*100).toFixed(1)}%</td>
+        <td>${(m.precision*100).toFixed(1)}%</td>
+        <td>${(m.recall*100).toFixed(1)}%</td>
+        <td>${(m.f1*100).toFixed(1)}%</td>
+        <td>${(m.cv_accuracy_mean*100).toFixed(1)}% ±${(m.cv_accuracy_std*100).toFixed(1)}%</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+    document.getElementById('modelMetricsContainer').innerHTML = html;
+
+    // Bar chart for model comparison
+    new Chart(document.getElementById('modelChart').getContext('2d'), {
+      type:'bar',
+      data:{
+        labels: names.map(n=>n.replace(/_/g,' ')),
+        datasets: metrics.map((m,i)=>({
+          label: m.charAt(0).toUpperCase()+m.slice(1),
+          data: names.map(n=>parseFloat((models[n][m]*100).toFixed(1))),
+          backgroundColor:['rgba(59,130,246,0.7)','rgba(16,185,129,0.7)','rgba(245,158,11,0.7)','rgba(139,92,246,0.7)'][i],
+          borderRadius:4
+        }))
+      },
+      options:{responsive:true,
+        plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:11}}},
+          y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#64748b',font:{size:10},callback:v=>v+'%'}}
+        }
+      }
+    });
+  } catch(e) {
+    document.getElementById('modelMetricsContainer').innerHTML='<span style="color:var(--red)">Error loading metrics: '+e.message+'</span>';
+  }
+}
+loadMetrics();
+</script>
+</body>
+</html>

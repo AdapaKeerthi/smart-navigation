@@ -2,5 +2,6 @@ Flask
 psycopg2-binary
 python-dotenv
 scikit-learn
+numpy
 gunicorn
 bcrypt

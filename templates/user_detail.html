@@ -1,102 +1,309 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>User Detail</title>
+  <title>DriveIQ – {{ username }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #050810;
+      --surface: #0f1629;
+      --surface2: #1a2235;
+      --accent: #3b82f6;
+      --accent2: #06b6d4;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --muted: #64748b;
+      --border: rgba(255,255,255,0.08);
+    }
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    <style>
-        body{
-            font-family:Arial;
-            background:#f5f6fa;
-            padding:20px;
-        }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
 
-        .card{
-            background:white;
-            padding:15px;
-            border-radius:10px;
-            margin-bottom:20px;
-            box-shadow:0 2px 8px rgba(0,0,0,0.1);
-        }
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
 
-        table{
-            width:100%;
-            border-collapse:collapse;
-        }
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
 
-        th, td{
-            padding:10px;
-            border-bottom:1px solid #ddd;
-            text-align:center;
-        }
+    .chip {
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      text-decoration: none;
+      transition: 0.2s;
+      margin-left: auto;
+    }
 
-        th{
-            background:#2c3e50;
-            color:white;
-        }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
 
-        a{
-            text-decoration:none;
-            font-weight:bold;
-        }
-    </style>
+    .main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    .user-hero {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+    }
+
+    .user-info h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    .user-info p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 30px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 14px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-safe  { background: rgba(16,185,129,0.15); color: #34d399; }
+    .badge-avg   { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+    .badge-risky { background: rgba(239,68,68,0.15);   color: #f87171; }
+
+    .score-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2>👤 {{ username }} - Full Analysis</h2>
-
-<a href="/admin">⬅ Back to Admin</a>
-
-<!-- GRAPH -->
-<div class="card">
-    <canvas id="chart"></canvas>
+<div class="header">
+  <div class="logo">⚡ DriveIQ</div>
+  <span style="color:var(--muted); font-size:13px;">Admin Panel</span>
+  <a href="/admin" class="chip">← Back to Admin</a>
 </div>
 
-<!-- TABLE -->
-<div class="card">
-    <h3>Driving History</h3>
+<div class="main">
 
+  <div class="user-hero">
+    <div class="avatar">{{ username[0].upper() }}</div>
+    <div class="user-info">
+      <h1>{{ username }}</h1>
+      <p>{{ data|length }} trips recorded</p>
+    </div>
+  </div>
+
+  {% if data %}
+
+  {% set avg_score = (data | map(attribute=3) | list | sum) / data|length %}
+  {% set best = data | map(attribute=3) | list | max %}
+  {% set worst = data | map(attribute=3) | list | min %}
+  {% set last_type = data[0][4] %}
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Avg Score</div>
+      <div class="stat-value" style="color: {% if avg_score >= 70 %}var(--green){% elif avg_score >= 50 %}var(--orange){% else %}var(--red){% endif %}">
+        {{ "%.0f"|format(avg_score) }}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Best Score</div>
+      <div class="stat-value" style="color: var(--green);">{{ best }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Worst Score</div>
+      <div class="stat-value" style="color: var(--red);">{{ worst }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Driver Type</div>
+      <div class="stat-value" style="font-size:16px; padding-top:8px; color: {% if 'Safe' in last_type %}var(--green){% elif 'Risky' in last_type %}var(--red){% else %}var(--orange){% endif %}">
+        {{ last_type }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card">
+    <div class="card-title">📈 Score Trend</div>
+    <canvas id="chart" height="80"></canvas>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-title">📋 All Trips</div>
     <table>
+      <thead>
         <tr>
-            <th>Deviation</th>
-            <th>Stops</th>
-            <th>Confusion</th>
-            <th>Score</th>
-            <th>Type</th>
-            <th>Time</th>
+          <th>#</th>
+          <th>Score</th>
+          <th>Deviations</th>
+          <th>Stops</th>
+          <th>Confusion</th>
+          <th>Driver Type</th>
+          <th>Time</th>
         </tr>
-
+      </thead>
+      <tbody>
         {% for row in data %}
+        {% set score = row[3] %}
         <tr>
-            <td>{{ row[0] }}</td>
-            <td>{{ row[1] }}</td>
-            <td>{{ row[2] }}</td>
-            <td>{{ row[3] }}</td>
-            <td>{{ row[4] }}</td>
-            <td>{{ row[5] }}</td>
+          <td style="color:var(--muted)">{{ loop.index }}</td>
+          <td>
+            <span class="score-pill" style="background:{% if score >= 70 %}rgba(16,185,129,0.15);color:#34d399{% elif score >= 50 %}rgba(245,158,11,0.15);color:#fbbf24{% else %}rgba(239,68,68,0.15);color:#f87171{% endif %}">
+              {{ score }}
+            </span>
+          </td>
+          <td>{{ row[0] }}</td>
+          <td>{{ row[1] }}</td>
+          <td>{{ row[2] }}</td>
+          <td>
+            <span class="badge {% if 'Safe' in row[4] %}badge-safe{% elif 'Risky' in row[4] %}badge-risky{% else %}badge-avg{% endif %}">
+              {{ row[4] }}
+            </span>
+          </td>
+          <td style="color:var(--muted);font-size:12px;">{{ row[5] }}</td>
         </tr>
         {% endfor %}
+      </tbody>
     </table>
-</div>
+  </div>
 
-<script>
-let scores = {{ data | map(attribute=3) | list | tojson }};
-let labels = {{ data | map(attribute=5) | list | tojson }};
+  <script>
+    // ✅ FIXED: indices match query: deviations=0, stops=1, confusion=2, score=3, driver_type=4, timestamp=5
+    const rawData = {{ data | tojson }};
+    const scores  = rawData.map(r => r[3]).reverse();
+    const labels  = rawData.map((_, i) => `Trip ${rawData.length - i}`).reverse();
 
-new Chart(document.getElementById("chart"), {
-    type: 'line',
-    data: {
-        labels: labels,
+    new Chart(document.getElementById('chart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
         datasets: [{
-            label: 'Score',
-            data: scores,
-            tension:0.3
+          label: 'Score',
+          data: scores,
+          fill: true,
+          tension: 0.4,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          pointBackgroundColor: scores.map(s => s >= 70 ? '#10b981' : s >= 50 ? '#f59e0b' : '#ef4444'),
+          pointRadius: 5,
+          borderWidth: 2
         }]
-    }
-});
-</script>
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } },
+          y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b' } }
+        }
+      }
+    });
+  </script>
 
+  {% else %}
+  <div style="text-align:center; padding:60px; color:var(--muted)">
+    <div style="font-size:48px">🚗</div>
+    <div style="margin-top:12px">No trips recorded for {{ username }} yet.</div>
+  </div>
+  {% endif %}
+
+</div>
 </body>
 </html>
